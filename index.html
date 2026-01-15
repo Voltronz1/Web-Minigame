@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Hub - Educational Minigames</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --text: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .hub-header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: slideDown 0.6s ease-out;
+        }
+
+        .hub-header h1 {
+            font-size: 3.5em;
+            color: var(--accent);
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .hub-header p {
+            font-size: 1.1em;
+            color: #94a3b8;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .game-card {
+            background: var(--card);
+            border: 2px solid rgba(56, 189, 248, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            animation: fadeIn 0.6s ease-out;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .game-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .game-card:hover::before {
+            left: 100%;
+        }
+
+        .game-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(56, 189, 248, 0.3);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .game-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .game-card h2 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            color: var(--accent);
+            position: relative;
+            z-index: 1;
+        }
+
+        .game-card p {
+            color: #94a3b8;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            line-height: 1.5;
+            position: relative;
+            z-index: 1;
+            flex-grow: 1;
+        }
+
+        .game-card .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent) 0%, #0ea5e9 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, var(--accent) 0%, #0ea5e9 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            margin-top: auto;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(56, 189, 248, 0.4);
+        }
+
+        .play-btn:active {
+            transform: scale(0.95);
+        }
+
+        .footer {
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9em;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(56, 189, 248, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .hub-header h1 {
+                font-size: 2.5em;
+            }
+
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .game-card {
+                padding: 20px;
+            }
+
+            .game-icon {
+                font-size: 3em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="hub-header">
+        <h1>🎮 GAME HUB</h1>
+        <p>Choose a game to begin your learning adventure</p>
+    </div>
+
+    <div class="games-grid">
+        <!-- Game 1 -->
+        <div class="game-card">
+            <div class="game-icon">🚩</div>
+            <h2>Flag Quest</h2>
+            <span class="badge">Geography</span>\
+            <p>Genre: Geography Trivia</p>
+            <p>Description: Identify global flags and capitals in this high-speed geography trivia challenge.</p>
+            <button class="play-btn" onclick="playGame('FlagMaster.html')">PLAY NOW</button>
+        </div>
+
+        <!-- Game 2 -->
+        <div class="game-card">
+            <div class="game-icon">👨‍🍳</div>
+            <h2>Atomic Chef</h2>
+            <span class="badge">Chemistry</span>
+            <p>Genre: Arcade Chemistry</p>
+            <p>Description: Race against the clock to synthesize molecules by combining atoms from the periodic table.</p>
+            <button class="play-btn" onclick="playGame('Atomic Chef.html')">PLAY NOW</button>
+        </div>
+
+        <!-- Game 3 -->
+        <div class="game-card">
+            <div class="game-icon">🎮</div>
+            <h2>MathFall</h2>
+            <span class="badge">Mathematics</span>
+            <p>Genre: Action Math</p>
+            <p>Drop numbers and catch falling math problems. Race against time to solve equations and rack up points in this fast-paced mathematical adventure.</p>
+            <button class="play-btn" onclick="playGame('MathFall.html')">PLAY NOW</button>
+        </div>
+
+        <!-- Game 4 -->
+        <div class="game-card">
+            <div class="game-icon">🚀</div>
+            <h2>Newton Artillery</h2>
+            <span class="badge">Physics</span>
+            <p>Calculate trajectories and launch projectiles with precision. Master Newton's laws of motion through engaging ballistics challenges.</p>
+            <button class="play-btn" onclick="playGame('Newton Artillery.html')">PLAY NOW</button>
+        </div>
+
+        <!-- Game 5 -->
+        <div class="game-card">
+            <div class="game-icon">⚡</div>
+            <h2>Logic Bit</h2>
+            <span class="badge">Computer Science</span>
+            <p>Build logic circuits and understand boolean operations. Master logic gates and digital circuits through interactive building challenges.</p>
+            <button class="play-btn" onclick="playGame('logic bit.html')">PLAY NOW</button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>💡 Educational Gaming Platform | 🌟 Learn. Play. Succeed.</p>
+    </div>
+</div>
+
+<script>
+    function playGame(filename) {
+        // Navigate to the selected game
+        window.location.href = filename;
+    }
+
+    // Add subtle animation on load
+    document.addEventListener('DOMContentLoaded', () => {
+        const cards = document.querySelectorAll('.game-card');
+        cards.forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
+        });
+    });
+</script>
+
+</body>
+</html>

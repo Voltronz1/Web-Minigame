@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathFall: City Defense</title>
+    <style>
+        :root {
+            --neon-green: #39ff14;
+            --neon-red: #ff073a;
+            --neon-blue: #00f3ff;
+            --neon-purple: #b300ff;
+            --bg: #050510;
+        }
+
+        * { box-sizing: border-box; font-family: 'Courier New', Courier, monospace; }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg);
+            color: var(--neon-green);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* GAME CONTAINER */
+        #game-stage {
+            width: 800px;
+            height: 600px;
+            position: relative;
+            background: linear-gradient(to bottom, #020205 0%, #101020 100%);
+            border: 2px solid #333;
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.1);
+            overflow: hidden;
+            border-radius: 12px;
+        }
+
+        /* STARFIELD BACKGROUND */
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.5;
+            animation: twinkle 2s infinite;
+        }
+        @keyframes twinkle { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+
+        /* CITY SKYLINE */
+        .city-layer {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 100px;
+            background: repeating-linear-gradient(
+                90deg,
+                #111 0px,
+                #111 20px,
+                transparent 20px,
+                transparent 25px
+            );
+            z-index: 5;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        
+        .building {
+            width: 40px; background: #0a0a15; 
+            border: 1px solid #39ff14; border-bottom: none;
+            margin: 0 2px;
+            position: relative;
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.1);
+        }
+        /* Windows */
+        .building::after {
+            content: ''; position: absolute; top: 5px; left: 5px; right: 5px; bottom: 0;
+            background-image: radial-gradient(var(--neon-green) 15%, transparent 16%);
+            background-size: 8px 8px; opacity: 0.3;
+        }
+
+        /* LASER TURRET (Center) */
+        .turret {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 40px; height: 40px;
+            background: #222;
+            border: 2px solid var(--neon-blue);
+            border-radius: 50%;
+            z-index: 10;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+        .turret::after {
+            content: ''; position: absolute; top: -10px; left: 13px;
+            width: 10px; height: 20px; background: var(--neon-blue);
+        }
+
+        /* LASER BEAM */
+        .laser-beam {
+            position: absolute;
+            background: var(--neon-blue);
+            height: 4px;
+            transform-origin: left center;
+            z-index: 8;
+            box-shadow: 0 0 10px var(--neon-blue);
+            opacity: 1;
+            transition: opacity 0.2s;
+        }
+
+        /* ENEMIES */
+        .equation-box {
+            position: absolute;
+            color: #fff;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 12px;
+            border: 1px solid var(--neon-red);
+            border-radius: 4px;
+            box-shadow: 0 0 10px var(--neon-red);
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 6;
+        }
+
+        /* EXPLOSION */
+        .boom {
+            position: absolute;
+            width: 50px; height: 50px;
+            background: radial-gradient(circle, #fff 0%, var(--neon-red) 50%, transparent 70%);
+            transform: translate(-50%, -50%);
+            animation: explode 0.4s ease-out forwards;
+            z-index: 9;
+        }
+        @keyframes explode { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
+
+        /* HUD & UI */
+        .hud {
+            position: absolute; top: 0; left: 0; width: 100%;
+            padding: 15px; display: flex; justify-content: space-between;
+            font-size: 1.5rem; font-weight: bold; text-transform: uppercase;
+            z-index: 20; text-shadow: 0 0 5px var(--neon-green);
+        }
+
+        .input-area {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            z-index: 20; width: 200px;
+        }
+        
+        #user-input {
+            width: 100%; padding: 10px;
+            background: rgba(0,0,0,0.9);
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            font-size: 2rem; text-align: center;
+            outline: none; border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+        }
+
+        /* SCREENS */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 50; text-align: center;
+        }
+        .hidden { display: none !important; }
+
+        h1 { font-size: 4rem; color: var(--neon-green); text-shadow: 0 0 20px var(--neon-green); margin: 0; }
+        p { color: #aaa; margin-bottom: 30px; font-size: 1.2rem; }
+        
+        .btn-start {
+            background: transparent; border: 2px solid var(--neon-green); color: var(--neon-green);
+            padding: 15px 40px; font-size: 1.5rem; cursor: pointer; text-transform: uppercase;
+            transition: 0.2s; font-weight: bold;
+        }
+        .btn-start:hover { background: var(--neon-green); color: black; box-shadow: 0 0 30px var(--neon-green); }
+
+        .back-btn {
+            position: absolute; top: 15px; right: 15px;
+            background: transparent; border: 1px solid #555; color: #555;
+            padding: 5px 10px; cursor: pointer; z-index: 60;
+        }
+        .back-btn:hover { border-color: #fff; color: #fff; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-stage">
+    
+    <div id="star-layer"></div>
+
+    <div class="hud">
+        <div>SCORE: <span id="score-disp">0</span></div>
+        <div style="color: var(--neon-red)">SHIELDS: <span id="lives-disp">100%</span></div>
+    </div>
+
+    <button class="back-btn" onclick="window.location.href='index.html'">EXIT CITY</button>
+
+    <div class="city-layer" id="city-buildings">
+        </div>
+    <div class="turret"></div>
+
+    <div id="entities"></div>
+
+    <div class="input-area">
+        <input type="number" id="user-input" autofocus autocomplete="off" placeholder="#">
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1>MATHFALL</h1>
+        <p>CITY DEFENSE SYSTEM ONLINE<br>Type answers to charge lasers.</p>
+        <button class="btn-start" onclick="Game.start()">ENGAGE</button>
+    </div>
+
+    <div id="game-over" class="overlay hidden">
+        <h1 style="color: var(--neon-red)">CITY FALLEN</h1>
+        <p>Final Score: <span id="final-score">0</span></p>
+        <button class="btn-start" onclick="Game.start()">REBOOT SYSTEM</button>
+    </div>
+
+</div>
+
+<script>
+    // --- AUDIO ---
+    const AudioSys = {
+        ctx: new (window.AudioContext || window.webkitAudioContext)(),
+        tone(freq, type, dur) {
+            if(this.ctx.state === 'suspended') this.ctx.resume();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + dur);
+            osc.connect(gain); gain.connect(this.ctx.destination);
+            osc.start(); osc.stop(this.ctx.currentTime + dur);
+        },
+        laser() { this.tone(800, 'square', 0.1); },
+        boom() { this.tone(100, 'sawtooth', 0.3); }
+    };
+
+    // --- GAME ENGINE ---
+    const Game = {
+        active: false,
+        score: 0,
+        lives: 3,
+        enemies: [],
+        spawnRate: 2000,
+        lastSpawn: 0,
+        speed: 0.5,
+        
+        // Dom Elements
+        stage: document.getElementById('entities'),
+        input: document.getElementById('user-input'),
+
+        init() {
+            this.generateStars();
+            this.generateCity();
+            
+            this.input.addEventListener('input', () => this.checkInput());
+            // Keep focus
+            document.getElementById('game-stage').addEventListener('click', () => this.input.focus());
+        },
+
+        generateStars() {
+            const layer = document.getElementById('star-layer');
+            for(let i=0; i<50; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                s.style.width = Math.random()*2 + 'px';
+                s.style.height = s.style.width;
+                s.style.left = Math.random()*100 + '%';
+                s.style.top = Math.random()*80 + '%';
+                layer.appendChild(s);
+            }
+        },
+
+        generateCity() {
+            const city = document.getElementById('city-buildings');
+            // Create random skyline
+            for(let i=0; i<15; i++) {
+                const b = document.createElement('div');
+                b.className = 'building';
+                b.style.height = (Math.random() * 60 + 20) + 'px';
+                b.style.width = (Math.random() * 40 + 30) + 'px';
+                city.appendChild(b);
+            }
+        },
+
+        start() {
+            this.active = true;
+            this.score = 0;
+            this.lives = 3;
+            this.enemies = [];
+            this.spawnRate = 2000;
+            this.speed = 0.5;
+            this.stage.innerHTML = ''; // clear enemies
+            
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over').classList.add('hidden');
+            this.input.value = '';
+            this.input.focus();
+            this.updateHUD();
+            
+            requestAnimationFrame((t) => this.loop(t));
+        },
+
+        loop(time) {
+            if(!this.active) return;
+
+            // Spawn
+            if (time - this.lastSpawn > this.spawnRate) {
+                this.spawnEnemy();
+                this.lastSpawn = time;
+                if(this.spawnRate > 500) this.spawnRate -= 20; // Difficulty ramp
+                this.speed += 0.01;
+            }
+
+            // Move
+            this.enemies.forEach((e, i) => {
+                e.y += this.speed;
+                e.el.style.top = e.y + 'px';
+
+                // Hit City
+                if (e.y > 500) { // Ground level approx
+                    this.damageCity();
+                    this.removeEnemy(i);
+                }
+            });
+
+            requestAnimationFrame((t) => this.loop(t));
+        },
+
+        spawnEnemy() {
+            const diff = Math.min(Math.floor(this.score / 500), 3); // 0-3
+            let q, a;
+
+            // Math Logic
+            const n1 = Math.floor(Math.random() * (diff*10 + 9)) + 2;
+            const n2 = Math.floor(Math.random() * 9) + 2;
+            
+            if(diff === 0) { q = `${n1} + ${n2}`; a = n1 + n2; }
+            else if (diff === 1) { q = `${n1 + n2} - ${n2}`; a = n1; }
+            else { q = `${n1} x ${n2}`; a = n1 * n2; }
+
+            const el = document.createElement('div');
+            el.className = 'equation-box';
+            el.innerText = q;
+            el.style.left = (Math.random() * 700 + 50) + 'px';
+            el.style.top = '-50px';
+            this.stage.appendChild(el);
+
+            this.enemies.push({ el: el, ans: a, y: -50, x: parseFloat(el.style.left) });
+        },
+
+        checkInput() {
+            const val = parseInt(this.input.value);
+            if (isNaN(val)) return;
+
+            const idx = this.enemies.findIndex(e => e.ans === val);
+            if (idx !== -1) {
+                this.fireLaser(this.enemies[idx]);
+                this.destroyEnemy(idx);
+                this.score += 100;
+                this.updateHUD();
+                this.input.value = '';
+            }
+        },
+
+        fireLaser(target) {
+            AudioSys.laser();
+            const beam = document.createElement('div');
+            beam.className = 'laser-beam';
+            
+            // Calc Geometry
+            // Turret is at 400px (center), 580px (bottom)
+            const tx = 400; 
+            const ty = 580;
+            const ex = target.x + 20; // center of box roughly
+            const ey = target.y + 20;
+
+            const dist = Math.sqrt(Math.pow(ex-tx, 2) + Math.pow(ey-ty, 2));
+            const angle = Math.atan2(ey-ty, ex-tx) * 180 / Math.PI;
+
+            beam.style.width = dist + 'px';
+            beam.style.left = tx + 'px';
+            beam.style.top = ty + 'px';
+            beam.style.transform = `rotate(${angle}deg)`;
+
+            this.stage.appendChild(beam);
+            setTimeout(() => { beam.style.opacity = 0; }, 100);
+            setTimeout(() => { beam.remove(); }, 300);
+        },
+
+        destroyEnemy(idx) {
+            const e = this.enemies[idx];
+            AudioSys.boom();
+            
+            // Explosion visual
+            const boom = document.createElement('div');
+            boom.className = 'boom';
+            boom.style.left = (e.x + 20) + 'px';
+            boom.style.top = (e.y + 20) + 'px';
+            this.stage.appendChild(boom);
+            setTimeout(() => boom.remove(), 400);
+
+            e.el.remove();
+            this.enemies.splice(idx, 1);
+        },
+
+        removeEnemy(idx) {
+            if(this.enemies[idx]) {
+                this.enemies[idx].el.remove();
+                this.enemies.splice(idx, 1);
+            }
+        },
+
+        damageCity() {
+            AudioSys.boom();
+            this.lives--;
+            this.updateHUD();
+            
+            // Screen Shake
+            const stage = document.getElementById('game-stage');
+            stage.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+            setTimeout(() => stage.style.transform = 'none', 100);
+
+            if(this.lives <= 0) this.gameOver();
+        },
+
+        updateHUD() {
+            document.getElementById('score-disp').innerText = this.score;
+            // 3 lives = 100%, 66%, 33%, 0
+            const pct = Math.floor((this.lives / 3) * 100);
+            const disp = document.getElementById('lives-disp');
+            disp.innerText = pct + "%";
+            disp.style.color = pct > 50 ? 'var(--neon-blue)' : 'var(--neon-red)';
+        },
+
+        gameOver() {
+            this.active = false;
+            document.getElementById('final-score').innerText = this.score;
+            document.getElementById('game-over').classList.remove('hidden');
+        }
+    };
+
+    Game.init();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEWTON'S ARTILLERY: TACTICAL</title>
+    <style>
+        :root {
+            --bg: #0b1021;
+            --panel: #161b2e;
+            --accent: #00d9ff;
+            --danger: #ff0055;
+            --success: #00ff99;
+            --fuel: #ffcc00;
+            --text: #ffffff;
+            --mono: 'Consolas', monospace;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-interface {
+            display: grid;
+            grid-template-rows: 60px 1fr 180px;
+            width: 1100px;
+            height: 750px;
+            background: var(--panel);
+            border: 2px solid #334466;
+            box-shadow: 0 0 50px rgba(0, 217, 255, 0.1);
+            position: relative;
+        }
+
+        /* --- HUD --- */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            background: rgba(0,0,0,0.4);
+            border-bottom: 1px solid #334466;
+        }
+
+        .btn-menu {
+            background: transparent;
+            border: 1px solid #445566;
+            color: #8899aa;
+            padding: 5px 15px;
+            font-family: var(--mono);
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-right: 20px;
+        }
+        .btn-menu:hover { border-color: var(--accent); color: var(--accent); }
+
+        .status-block { width: 280px; }
+        .bar-container { height: 10px; background: #000; border: 1px solid #444; margin-top: 5px; position: relative; }
+        .hp-fill { height: 100%; width: 100%; transition: width 0.3s; }
+        .p1-hp { background: var(--accent); }
+        .p2-hp { background: var(--danger); }
+        
+        .fuel-container { height: 4px; background: #000; width: 100%; margin-top: 2px; }
+        .fuel-fill { height: 100%; background: var(--fuel); width: 100%; transition: width 0.1s; }
+
+        .wind-display { text-align: center; }
+        .wind-arrow { font-size: 1.5rem; display: inline-block; transition: transform 0.5s; }
+
+        /* --- VIEWPORT --- */
+        #viewport {
+            position: relative;
+            background-image: 
+                linear-gradient(rgba(0, 217, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 217, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            overflow: hidden;
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- TURN BANNER --- */
+        .turn-banner {
+            position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); border: 2px solid var(--accent);
+            padding: 20px 60px; font-size: 2rem; font-weight: bold;
+            color: var(--accent); opacity: 0; pointer-events: none;
+            transition: opacity 0.3s; z-index: 20; letter-spacing: 5px;
+        }
+        .turn-banner.show { opacity: 1; }
+
+        /* --- CONTROLS --- */
+        .controls {
+            display: grid;
+            grid-template-columns: 280px 1fr 200px;
+            gap: 20px;
+            padding: 20px;
+            background: #0f1320;
+            border-top: 1px solid #334466;
+        }
+
+        .inputs { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+        .slider-row { display: flex; align-items: center; gap: 10px; color: #88aaff; font-size: 0.9rem; }
+        input[type=range] { flex-grow: 1; accent-color: var(--accent); cursor: pointer; }
+        
+        .num-input { 
+            width: 50px; text-align: center; color: #fff; font-weight: bold; 
+            background: #000; border: 1px solid #334466; font-family: var(--mono);
+            padding: 2px;
+        }
+        .num-input:focus { border-color: var(--accent); outline: none; }
+
+        .weapons {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 5px;
+            border-left: 1px solid #334466;
+            border-right: 1px solid #334466;
+        }
+
+        .wep-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #334466;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: 0.2s; position: relative;
+        }
+        .wep-card:hover { background: rgba(0, 217, 255, 0.1); border-color: var(--accent); }
+        .wep-card.active { background: var(--accent); color: #000; box-shadow: 0 0 15px var(--accent); border-color: #fff; }
+        .wep-card.locked { opacity: 0.6; border-color: #522; }
+        
+        .wep-icon { font-size: 1.5rem; margin-bottom: 5px; }
+        .wep-name { font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .badge {
+            position: absolute; top: 2px; right: 2px; font-size: 0.6rem;
+            background: #000; color: var(--accent); padding: 1px 4px; border: 1px solid var(--accent);
+        }
+
+        .fire-btn {
+            width: 100%; height: 80px;
+            background: transparent; color: var(--danger);
+            border: 2px solid var(--danger);
+            font-family: var(--mono); font-size: 1.8rem; font-weight: bold;
+            cursor: pointer; transition: 0.2s;
+            box-shadow: 0 0 10px rgba(255, 0, 85, 0.2);
+        }
+        .fire-btn:hover { background: var(--danger); color: #000; box-shadow: 0 0 30px var(--danger); }
+        .fire-btn:disabled { border-color: #555; color: #555; cursor: not-allowed; box-shadow: none; background: transparent; }
+
+        /* --- MODALS --- */
+        .modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 50;
+        }
+        .hidden { display: none !important; }
+
+        .math-panel {
+            background: #161b2e; border: 2px solid var(--success);
+            padding: 30px; border-radius: 12px; text-align: center;
+            box-shadow: 0 0 40px rgba(0, 255, 153, 0.2); width: 350px;
+        }
+        .math-q { font-size: 1.2rem; color: #fff; margin-bottom: 20px; line-height: 1.5; }
+        .math-input {
+            width: 100%; padding: 10px; font-family: var(--mono); font-size: 1.5rem;
+            background: #000; border: 1px solid var(--success); color: var(--success);
+            text-align: center; margin-bottom: 20px; outline: none;
+        }
+        .btn-sub { background: var(--success); color: #000; border: none; padding: 10px 25px; font-weight: bold; cursor: pointer; font-family: var(--mono); font-size: 1rem; margin: 5px; }
+        
+        .title-txt { font-size: 3.5rem; color: var(--accent); margin-bottom: 10px; text-shadow: 0 0 20px var(--accent); }
+        .diff-btn { background: transparent; border: 2px solid var(--accent); color: var(--accent); padding: 15px 30px; font-size: 1.2rem; cursor: pointer; margin: 0 10px; transition: 0.2s; font-weight: bold; }
+        .diff-btn:hover { background: var(--accent); color: black; box-shadow: 0 0 20px var(--accent); }
+
+        /* Floating Damage */
+        .dmg-float { position: absolute; color: #fff; font-weight: bold; font-size: 1.2rem; pointer-events: none; animation: float 1s forwards; text-shadow: 0 0 5px #000; }
+        @keyframes float { to { transform: translateY(-50px); opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+<div id="game-interface">
+    
+    <div class="hud">
+        <button class="btn-menu" onclick="Game.goToMenu()">☰ MENU</button>
+        <button class="btn-menu" onclick="window.location.href='index.html'" style="position: absolute; right: 20px; background: #3498db; color: white;">↩ HUB</button>
+        
+        <div class="status-block">
+            <span style="color:var(--accent)">PLAYER 1</span>
+            <div class="bar-container"><div class="hp-fill p1-hp" id="hp-p1"></div></div>
+            <div class="fuel-container"><div class="fuel-fill" id="fuel-p1"></div></div>
+        </div>
+        
+        <div class="wind-display">
+            <div style="font-size: 0.8rem; color: #888;">WIND</div>
+            <span class="wind-arrow" id="wind-icon">➤</span>
+            <div id="wind-val" style="color: #fff; font-weight: bold;">0</div>
+        </div>
+
+        <div class="status-block" style="text-align: right;">
+            <span style="color:var(--danger)">CPU</span>
+            <div class="bar-container"><div class="hp-fill p2-hp" id="hp-p2"></div></div>
+        </div>
+    </div>
+
+    <div id="viewport">
+        <canvas id="gameCanvas"></canvas>
+        <div id="fx-layer"></div>
+        <div id="turn-banner" class="turn-banner">PLAYER TURN</div>
+
+        <div id="math-modal" class="modal hidden">
+            <div class="math-panel">
+                <h3 style="color:var(--success); margin-top:0;">SECURITY CHECK</h3>
+                <div class="math-q" id="math-q">...</div>
+                <input type="number" id="math-ans" class="math-input" placeholder="?" onkeydown="if(event.key==='Enter') Game.checkMath()">
+                <button class="btn-sub" onclick="Game.checkMath()">AUTHORIZE</button>
+                <button style="background:none; border:none; color:#666; cursor:pointer; margin-left:10px;" onclick="Game.closeMath()">CANCEL</button>
+            </div>
+        </div>
+
+        <div id="start-screen" class="modal">
+            <h1 class="title-txt">NEWTON'S ARTILLERY</h1>
+            <p style="color:#aaa; margin-bottom: 30px;">Select Difficulty</p>
+            <div>
+                <button class="diff-btn" onclick="Game.start('easy')">RECRUIT</button>
+                <button class="diff-btn" onclick="Game.start('medium')">SOLDIER</button>
+                <button class="diff-btn" onclick="Game.start('hard')">VETERAN</button>
+            </div>
+        </div>
+
+        <div id="end-screen" class="modal hidden">
+            <h1 style="font-size: 4rem; color: var(--fuel);" id="end-msg">VICTORY</h1>
+            <button class="btn-sub" onclick="Game.goToMenu()">RETURN TO BASE</button>
+            <button class="btn-sub" onclick="window.location.href='index.html'" style="background: #3498db; margin-left: 10px;">↩ MAIN MENU</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="inputs">
+            <div class="slider-row">
+                <label>ANGLE</label>
+                <input type="range" id="inp-angle" min="0" max="180" value="45" oninput="Game.syncInputs('angle', this.value)">
+                <input type="number" id="num-angle" class="num-input" min="0" max="180" value="45" onchange="Game.syncInputs('angle', this.value)">
+            </div>
+            <div class="slider-row">
+                <label>POWER</label>
+                <input type="range" id="inp-power" min="0" max="100" value="65" oninput="Game.syncInputs('power', this.value)">
+                <input type="number" id="num-power" class="num-input" min="0" max="100" value="65" onchange="Game.syncInputs('power', this.value)">
+            </div>
+        </div>
+
+        <div class="weapons">
+            <div class="wep-card active" id="wep-0" onclick="Game.selectWeapon(0)">
+                <div class="wep-icon">●</div>
+                <div class="wep-name">Shell</div>
+            </div>
+            <div class="wep-card locked" id="wep-1" onclick="Game.tryUnlock(1)">
+                <div class="badge">PHYS</div>
+                <div class="wep-icon">⚡</div>
+                <div class="wep-name">Railgun</div>
+            </div>
+            <div class="wep-card locked" id="wep-2" onclick="Game.tryUnlock(2)">
+                <div class="badge">PHYS</div>
+                <div class="wep-icon">❖</div>
+                <div class="wep-name">Cluster</div>
+            </div>
+            <div class="wep-card locked" id="wep-3" onclick="Game.tryUnlock(3)">
+                <div class="badge">HARD</div>
+                <div class="wep-icon">☢</div>
+                <div class="wep-name">Nuke</div>
+            </div>
+        </div>
+
+        <div>
+            <button class="fire-btn" id="btn-fire" onclick="Game.fire()">FIRE</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- PHYSICS PROBLEM GENERATOR ---
+    const PhysicsGen = {
+        generate(diff) {
+            let q = "", a = 0;
+            
+            // DIFFICULTY: EASY (Arithmetic Only)
+            if (diff === 'easy') {
+                const n1 = Math.floor(Math.random() * 20) + 1;
+                const n2 = Math.floor(Math.random() * 20) + 1;
+                if (Math.random() > 0.5) {
+                    q = `${n1} + ${n2} = ?`; a = n1 + n2;
+                } else {
+                    q = `${n1 + n2} - ${n2} = ?`; a = n1;
+                }
+            } 
+            // DIFFICULTY: MEDIUM (Basic Physics)
+            else if (diff === 'medium') {
+                const type = Math.floor(Math.random() * 2); 
+                const n1 = Math.floor(Math.random() * 10) + 2;
+                const n2 = Math.floor(Math.random() * 10) + 2;
+                
+                if (type === 0) { // Force F=ma
+                    q = `Find Force (N):<br>Mass = ${n1} kg<br>Accel = ${n2} m/s²`;
+                    a = n1 * n2;
+                } else { // Velocity V=d/t
+                    const dist = n1 * n2;
+                    q = `Find Velocity (m/s):<br>Dist = ${dist} m<br>Time = ${n1} s`;
+                    a = n2;
+                }
+            }
+            // DIFFICULTY: HARD (Advanced Physics)
+            else {
+                const type = Math.floor(Math.random() * 2);
+                const n1 = Math.floor(Math.random() * 12) + 4;
+                const n2 = Math.floor(Math.random() * 12) + 4;
+
+                if (type === 0) { // Work W=Fd
+                    q = `Find Work (J):<br>Force = ${n1} N<br>Dist = ${n2} m`;
+                    a = n1 * n2;
+                } else { // KE = 0.5mv^2
+                    const m = n1 * 2; // Even mass
+                    q = `Find KE (J):<br>Mass = ${m} kg<br>Vel = ${n2} m/s`;
+                    a = 0.5 * m * n2 * n2;
+                }
+            }
+            return { q, a };
+        }
+    };
+
+    // --- GAME DATA ---
+    const WEAPONS = [
+        { name: "Shell", dmg: 15, r: 30, count: 1, spread: 0, color: "#fff", type: "ballistic" },
+        { name: "Railgun", dmg: 40, r: 20, count: 1, spread: 0, color: "#00d9ff", type: "beam" }, 
+        { name: "Cluster", dmg: 8, r: 40, count: 5, spread: 0.15, color: "#ffcc00", type: "spread" }, 
+        { name: "Nuke", dmg: 60, r: 100, count: 1, spread: 0, color: "#ff0055", type: "nuke" } 
+    ];
+
+    // --- GAME ENGINE ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = 1100, H = 560;
+    canvas.width = W; canvas.height = H;
+
+    const Game = {
+        difficulty: 'easy',
+        terrain: [],
+        wind: 0,
+        turn: 'p1', 
+        state: 'idle', 
+        
+        p1: { x: 100, y: 0, hp: 100, fuel: 100, angle: 45, power: 65, wepIdx: 0 },
+        p2: { x: 1000, y: 0, hp: 100, fuel: 100 },
+        
+        projectiles: [],
+        particles: [],
+        pendingWep: 0,
+        currentAns: 0,
+
+        init() {
+            window.addEventListener('keydown', e => this.handleMove(e));
+            this.genTerrain();
+            this.placeTanks();
+            this.loop();
+        },
+
+        start(diff) {
+            this.difficulty = diff;
+            document.getElementById('start-screen').classList.add('hidden');
+            
+            // Reset for new game
+            this.p1.hp = 100; this.p1.fuel = 100; this.p1.x = 100;
+            this.p2.hp = 100; this.p2.x = 1000;
+            this.updateHealthUI();
+            
+            this.genTerrain();
+            this.placeTanks();
+            this.setTurn('p1');
+        },
+
+        goToMenu() {
+            document.getElementById('start-screen').classList.remove('hidden');
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('math-modal').classList.add('hidden');
+            this.state = 'idle'; // Stop any ongoing CPU actions
+        },
+
+        /* --- INPUT HANDLING --- */
+        syncInputs(type, val) {
+            val = parseInt(val);
+            if (type === 'angle') {
+                if(val < 0) val = 0; if(val > 180) val = 180; 
+                this.p1.angle = val;
+                document.getElementById('inp-angle').value = val;
+                document.getElementById('num-angle').value = val;
+            } else {
+                if(val < 0) val = 0; if(val > 100) val = 100;
+                this.p1.power = val;
+                document.getElementById('inp-power').value = val;
+                document.getElementById('num-power').value = val;
+            }
+        },
+
+        /* --- TURN MANAGEMENT --- */
+        setTurn(who) {
+            this.turn = who;
+            this.state = 'idle';
+            this.wind = (Math.random() * 4) - 2; 
+            
+            this.updateWindUI();
+            const banner = document.getElementById('turn-banner');
+            banner.innerText = who === 'p1' ? "PLAYER TURN" : "CPU TURN";
+            banner.style.color = who === 'p1' ? "var(--accent)" : "var(--danger)";
+            banner.classList.add('show');
+            setTimeout(() => banner.classList.remove('show'), 1500);
+
+            if(who === 'p1') {
+                this.p1.fuel = 100; 
+                this.updateFuelUI();
+                document.getElementById('btn-fire').disabled = false;
+            } else {
+                this.p2.fuel = 100;
+                document.getElementById('btn-fire').disabled = true;
+                this.cpuRoutine();
+            }
+        },
+
+        updateWindUI() {
+            const val = Math.abs(this.wind).toFixed(1);
+            document.getElementById('wind-val').innerText = val;
+            document.getElementById('wind-icon').style.transform = `rotate(${this.wind > 0 ? 0 : 180}deg)`;
+            document.getElementById('wind-icon').style.color = this.wind > 0 ? "var(--success)" : "var(--danger)";
+        },
+
+        /* --- MOVEMENT --- */
+        handleMove(e) {
+            if(this.turn !== 'p1' || this.state !== 'idle') return;
+            if(this.p1.fuel <= 0) return;
+
+            let moved = false;
+            if(e.key === 'ArrowLeft') {
+                this.p1.x = Math.max(20, this.p1.x - 3);
+                moved = true;
+            }
+            if(e.key === 'ArrowRight') {
+                this.p1.x = Math.min(W/2, this.p1.x + 3);
+                moved = true;
+            }
+
+            if(moved) {
+                this.p1.fuel -= 2;
+                this.updateFuelUI();
+                this.placeTanks();
+            }
+        },
+
+        updateFuelUI() {
+            document.getElementById('fuel-p1').style.width = this.p1.fuel + "%";
+        },
+
+        /* --- TERRAIN --- */
+        genTerrain() {
+            this.terrain = new Array(W).fill(0);
+            let h = H - 150;
+            let s = 0;
+            for(let i=0; i<W; i++) {
+                s += (Math.random()-0.5)*0.8;
+                s += ((H-200) - h)*0.002;
+                s = Math.max(-2, Math.min(2, s));
+                h += s;
+                if(h>H) h=H;
+                this.terrain[i] = h;
+            }
+            this.flatten(100); this.flatten(1000);
+        },
+        flatten(cx) {
+            let avg = 0;
+            for(let i=cx-20; i<cx+20; i++) avg += this.terrain[i];
+            avg /= 40;
+            for(let i=cx-20; i<cx+20; i++) this.terrain[i] = avg;
+        },
+        placeTanks() {
+            this.p1.y = this.terrain[Math.floor(this.p1.x)] || H;
+            this.p2.y = this.terrain[Math.floor(this.p2.x)] || H;
+            if(this.p1.y > H-5) this.damage('p1', 100);
+            if(this.p2.y > H-5) this.damage('p2', 100);
+        },
+
+        /* --- WEAPONS & MATH --- */
+        selectWeapon(idx) {
+            if(this.state !== 'idle' || this.turn !== 'p1') return;
+            this.setActiveWep(idx);
+            this.p1.wepIdx = idx;
+        },
+
+        tryUnlock(idx) {
+            if(this.state !== 'idle' || this.turn !== 'p1') return;
+            this.pendingWep = idx;
+            this.state = 'modal';
+            
+            const prob = PhysicsGen.generate(this.difficulty);
+            this.currentAns = prob.a;
+            
+            document.getElementById('math-q').innerHTML = prob.q;
+            document.getElementById('math-ans').value = '';
+            document.getElementById('math-modal').classList.remove('hidden');
+            document.getElementById('math-ans').focus();
+        },
+
+        checkMath() {
+            const val = parseFloat(document.getElementById('math-ans').value);
+            if(Math.abs(val - this.currentAns) < 0.1) {
+                this.closeMath();
+                this.p1.wepIdx = this.pendingWep;
+                this.setActiveWep(this.pendingWep);
+                this.state = 'idle';
+            } else {
+                document.getElementById('math-ans').style.borderColor = 'red';
+                setTimeout(()=>document.getElementById('math-ans').style.borderColor='var(--success)', 500);
+            }
+        },
+
+        closeMath() {
+            document.getElementById('math-modal').classList.add('hidden');
+            this.state = 'idle';
+        },
+
+        setActiveWep(idx) {
+            for(let i=0; i<4; i++) {
+                const el = document.getElementById(`wep-${i}`);
+                if(i===idx) { el.classList.add('active'); el.classList.remove('locked'); }
+                else { el.classList.remove('active'); if(i>0) el.classList.add('locked'); }
+            }
+        },
+
+        /* --- FIRE LOGIC --- */
+        fire() {
+            if(this.state !== 'idle') return;
+            this.state = 'firing';
+            document.getElementById('btn-fire').disabled = true;
+
+            const shooter = this.turn === 'p1' ? this.p1 : this.p2;
+            const wep = this.turn === 'p1' ? WEAPONS[this.p1.wepIdx] : WEAPONS[0]; 
+            
+            const rad = (shooter.angle * Math.PI) / 180;
+            const pwr = shooter.power * 0.25;
+
+            for(let i=0; i<wep.count; i++) {
+                let vx = Math.cos(-rad) * pwr;
+                let vy = Math.sin(-rad) * pwr;
+                if(this.turn === 'p2') vx = -vx; 
+
+                if(wep.type === 'beam') { vx *= 1.5; vy *= 1.5; }
+                if(wep.type === 'spread') { vx += (Math.random()-0.5); vy += (Math.random()-0.5); }
+
+                this.projectiles.push({
+                    x: shooter.x, y: shooter.y - 15,
+                    vx: vx, vy: vy,
+                    wep: wep, active: true, owner: this.turn
+                });
+            }
+
+            if(this.turn === 'p1' && this.p1.wepIdx !== 0) {
+                setTimeout(() => this.selectWeapon(0), 1000);
+            }
+        },
+
+        cpuRoutine() {
+            setTimeout(() => {
+                const dx = Math.abs(this.p1.x - this.p2.x);
+                const angle = 135 + (Math.random()*20 - 10);
+                
+                let distFactor = dx / 14; 
+                if(angle > 140) distFactor *= 1.2;
+                
+                let power = distFactor;
+                power -= (this.wind * 2); 
+
+                // --- CPU INTELLIGENCE ---
+                let error = 0;
+                if(this.difficulty === 'easy') error = 20; 
+                else if(this.difficulty === 'medium') error = 8;
+                else error = 1; // Hard is accurate
+
+                if(this.difficulty === 'easy') power += (this.wind * 2); 
+
+                power += (Math.random() * error * 2 - error); 
+                power = Math.max(10, Math.min(100, power));
+
+                this.p2.angle = 180 - angle; 
+                this.p2.power = power; 
+                
+                const rad = (angle * Math.PI) / 180;
+                const speed = power * 0.25;
+
+                this.state = 'firing';
+                this.projectiles.push({
+                    x: this.p2.x, y: this.p2.y - 15,
+                    vx: Math.cos(-rad) * speed,
+                    vy: Math.sin(-rad) * speed,
+                    wep: WEAPONS[0], active: true, owner: 'p2'
+                });
+
+            }, 2000); 
+        },
+
+        /* --- PHYSICS & EXPLOSIONS --- */
+        explode(p) {
+            this.spawnParticles(p.x, p.y, p.wep.color);
+            
+            const r = p.wep.r;
+            const cx = Math.floor(p.x);
+            for(let i=cx-r; i<cx+r; i++) {
+                if(i>=0 && i<W) {
+                    const dx = i-cx;
+                    const dy = Math.sqrt(r*r - dx*dx);
+                    this.terrain[i] += dy;
+                    if(this.terrain[i] > H) this.terrain[i] = H;
+                }
+            }
+
+            const target = p.owner === 'p1' ? 'p2' : 'p1';
+            const tObj = target === 'p1' ? this.p1 : this.p2;
+            
+            const dist = Math.sqrt(Math.pow(p.x - tObj.x, 2) + Math.pow(p.y - tObj.y, 2));
+            if(dist < r + 20) {
+                this.damage(target, p.wep.dmg);
+            }
+            this.placeTanks();
+        },
+
+        damage(who, amt) {
+            const t = who === 'p1' ? this.p1 : this.p2;
+            t.hp = Math.max(0, t.hp - amt);
+            this.updateHealthUI();
+            
+            const el = document.createElement('div');
+            el.className = 'dmg-float';
+            el.innerText = `-${amt}`;
+            el.style.left = (t.x + 20) + 'px';
+            el.style.top = (t.y - 40) + 'px';
+            document.getElementById('fx-layer').appendChild(el);
+            setTimeout(()=>el.remove(), 1000);
+
+            if(t.hp <= 0) {
+                document.getElementById('end-screen').classList.remove('hidden');
+                document.getElementById('end-msg').innerText = who === 'p2' ? "VICTORY" : "DEFEAT";
+                document.getElementById('end-msg').style.color = who === 'p2' ? "var(--success)" : "var(--danger)";
+                this.state = 'gameover';
+            }
+        },
+
+        updateHealthUI() {
+            document.getElementById('hp-p1').style.width = this.p1.hp + "%";
+            document.getElementById('hp-p2').style.width = this.p2.hp + "%";
+        },
+
+        spawnParticles(x, y, c) {
+            for(let i=0; i<15; i++) {
+                this.particles.push({
+                    x:x, y:y, vx:(Math.random()-0.5)*8, vy:(Math.random()-0.5)*8,
+                    life:1, color:c
+                });
+            }
+        },
+
+        /* --- LOOP --- */
+        loop() {
+            ctx.fillStyle = '#0b1021';
+            ctx.fillRect(0,0,W,H);
+
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.moveTo(0,H);
+            for(let i=0; i<W; i++) ctx.lineTo(i, this.terrain[i]);
+            ctx.lineTo(W,H);
+            ctx.fill();
+            ctx.strokeStyle = '#334466';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            this.drawTank(this.p1.x, this.p1.y, '#00d9ff', this.p1.angle, false);
+            this.drawTank(this.p2.x, this.p2.y, '#ff0055', 180-this.p2.angle, true);
+
+            let active = false;
+            for(let p of this.projectiles) {
+                if(!p.active) continue;
+                active = true;
+                
+                p.vy += 0.15; // Gravity
+                p.vx += (this.wind * 0.05);
+                p.x += p.vx; p.y += p.vy;
+
+                if(p.y >= (this.terrain[Math.floor(p.x)]||H) || p.x<0 || p.x>W) {
+                    p.active = false;
+                    if(p.x>0 && p.x<W) this.explode(p);
+                }
+
+                ctx.fillStyle = p.wep.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+            }
+
+            for(let i=this.particles.length-1; i>=0; i--) {
+                let pt = this.particles[i];
+                pt.x+=pt.vx; pt.y+=pt.vy; pt.life-=0.05;
+                ctx.globalAlpha = pt.life;
+                ctx.fillStyle = pt.color;
+                ctx.fillRect(pt.x, pt.y, 4, 4);
+                ctx.globalAlpha = 1;
+                if(pt.life<=0) this.particles.splice(i,1);
+            }
+
+            // Check Turn End
+            if(this.state === 'firing' && !active && this.particles.length === 0) {
+                const next = this.turn === 'p1' ? 'p2' : 'p1';
+                this.setTurn(next);
+            }
+
+            requestAnimationFrame(() => this.loop());
+        },
+
+        drawTank(x, y, c, ang, flip) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            ctx.save();
+            ctx.translate(0, -8);
+            let r = flip ? (ang*Math.PI/180) : (-ang*Math.PI/180);
+            ctx.rotate(r);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, -2, 22, 4);
+            ctx.restore();
+
+            ctx.fillStyle = c;
+            ctx.beginPath(); ctx.arc(0, -6, 9, Math.PI, 0); ctx.fill();
+            ctx.fillRect(-11, -6, 22, 7);
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(flip ? "CPU" : "P1", 0, 15);
+            ctx.restore();
+        }
+    };
+
+    Game.init();
+
+</script>
+</body>
+</html>

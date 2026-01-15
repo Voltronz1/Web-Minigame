@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOGIC BIT: FINAL</title>
+    <style>
+        :root {
+            --bg: #2d2d3a;
+            --panel: #3e3e4e;
+            --accent: #ff9f43; /* Orange */
+            --bot: #54a0ff; /* Blue */
+            --goal: #1dd1a1; /* Green */
+            --hazard: #ff6b6b; /* Red */
+            --code-bg: #1e1e26;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: auto;
+            user-select: none;
+            padding: 20px;
+        }
+
+        #game-layout {
+            display: grid;
+            grid-template-columns: 450px 300px;
+            gap: 20px;
+            padding: 20px;
+            background: var(--panel);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            align-items: start;
+        }
+
+        /* LEFT: GAME VIEW */
+        .viewport {
+            position: relative;
+            width: 450px;
+            height: 450px;
+        }
+        
+        canvas {
+            background: #222;
+            border-radius: 8px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            display: block;
+            margin: 0 auto;
+        }
+
+        .level-badge {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 15px; border-radius: 20px;
+            font-weight: bold; font-size: 0.9rem;
+            color: var(--accent);
+            z-index: 5;
+        }
+
+        /* RIGHT: CONTROL PANEL (FIXED) */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 450px; /* Fixed height matching the game screen */
+        }
+
+        h2 { margin: 0; color: #ccc; font-size: 1.2rem; text-transform: uppercase; border-bottom: 2px solid #555; padding-bottom: 5px; }
+
+        /* COMMAND QUEUE (SCROLLABLE) */
+        #program-display {
+            background: var(--code-bg);
+            flex-grow: 1; /* Takes up all available remaining space */
+            border-radius: 8px;
+            border: 1px solid #555;
+            padding: 10px;
+            overflow-y: auto; /* Scrollbar appears here */
+            font-family: monospace;
+            font-size: 1rem;
+            min-height: 0; /* Crucial for flex scrolling */
+        }
+
+        .cmd-line {
+            padding: 5px;
+            border-bottom: 1px solid #333;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .cmd-line.active { background: #333; color: white; border-left: 4px solid var(--accent); }
+        .line-num { color: #555; width: 20px; text-align: right; margin-right: 5px; }
+
+        /* BUTTONS */
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            flex-shrink: 0; /* Prevents buttons from squishing */
+        }
+
+        button {
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        .btn-move { background: #54a0ff; color: white; }
+        .btn-move:hover { background: #2e86de; }
+        
+        .btn-turn { background: #48dbfb; color: #333; }
+        .btn-turn:hover { background: #0abde3; }
+
+        .btn-action { grid-column: 1 / -1; margin-top: 5px; font-size: 1rem; padding: 15px; }
+        .btn-run { background: var(--goal); color: #000; }
+        .btn-run:hover { background: #10ac84; }
+        
+        .btn-reset { background: var(--hazard); color: white; }
+        .btn-reset:hover { background: #ee5253; }
+        
+        .btn-clear { background: #666; color: white; }
+        .btn-menu { background: transparent; border: 1px solid #666; color: #aaa; margin-top: 5px; }
+        .btn-menu:hover { border-color: white; color: white; }
+
+        /* MODALS */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(30, 30, 38, 0.95);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 100; text-align: center;
+            border-radius: 12px;
+        }
+        .hidden { display: none !important; }
+
+        .title-lg { font-size: 3rem; color: var(--accent); margin-bottom: 10px; letter-spacing: 4px; }
+        .diff-container { display: flex; gap: 15px; margin-top: 20px; }
+        
+        .btn-diff { width: 120px; padding: 20px; font-size: 1.1rem; border: 2px solid transparent; }
+        .diff-easy { background: rgba(29, 209, 161, 0.2); color: #1dd1a1; border-color: #1dd1a1; }
+        .diff-easy:hover { background: #1dd1a1; color: #000; }
+        
+        .diff-norm { background: rgba(84, 160, 255, 0.2); color: #54a0ff; border-color: #54a0ff; }
+        .diff-norm:hover { background: #54a0ff; color: #000; }
+        
+        .diff-hard { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; border-color: #ff6b6b; }
+        .diff-hard:hover { background: #ff6b6b; color: #000; }
+
+        .win-title { color: var(--goal); font-size: 2.5rem; margin-bottom: 10px; }
+        .fail-title { color: var(--hazard); font-size: 2.5rem; margin-bottom: 10px; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-layout">
+    
+    <div id="start-screen" class="overlay">
+        <h1 class="title-lg">LOGIC BIT</h1>
+        <p style="color: #ccc;">Select Difficulty</p>
+        <div class="diff-container">
+            <button class="btn-diff diff-easy" onclick="Game.start('easy')">EASY</button>
+            <button class="btn-diff diff-norm" onclick="Game.start('normal')">NORMAL</button>
+            <button class="btn-diff diff-hard" onclick="Game.start('hard')">HARD</button>
+        </div>
+        <button class="btn-menu" style="margin-top: 20px; width: 100%; background: #3498db; color: white;" onclick="window.location.href='index.html'">↩ Back to Main Menu</button>
+    </div>
+
+    <div id="msg-overlay" class="overlay hidden">
+        <h1 id="msg-title" class="win-title">SUCCESS</h1>
+        <p id="msg-text" style="color:#ccc; margin-bottom: 20px;">Program Executed Successfully.</p>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-move" onclick="Game.nextLevel()" id="btn-next">Next Level</button>
+            <button class="btn-reset" onclick="Game.retryLevel()" id="btn-retry" class="hidden">Retry</button>
+            <button class="btn-menu" onclick="Game.showMenu()">Main Menu</button>
+        </div>
+    </div>
+
+    <div class="viewport">
+        <canvas id="canvas" width="450" height="450"></canvas>
+        <div class="level-badge" id="level-display">Level 1</div>
+    </div>
+
+    <div class="controls">
+        <h2>Program Memory</h2>
+        <div id="program-display">
+            </div>
+
+        <h2>Commands</h2>
+        <div class="btn-grid">
+            <button class="btn-turn" onclick="Game.addCommand('LEFT')">↺ Left</button>
+            <button class="btn-move" onclick="Game.addCommand('MOVE')">▲ Fwd</button>
+            <button class="btn-turn" onclick="Game.addCommand('RIGHT')">↻ Right</button>
+            
+            <button class="btn-clear" onclick="Game.popCommand()">⌫ Undo</button>
+            <button class="btn-clear" onclick="Game.clearProgram()">Trash</button>
+            <button class="btn-menu" style="font-size: 0.8rem;" onclick="Game.showMenu()">Menu</button>
+            <button class="btn-menu" style="font-size: 0.8rem; background: #3498db; color: white;" onclick="window.location.href='index.html'">↩ Hub</button>
+            
+            <button class="btn-action btn-run" onclick="Game.run()">▶ RUN PROGRAM</button>
+            <button class="btn-action btn-reset" onclick="Game.resetSim()">■ STOP / RESET</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const Sfx = {
+        ctx: null,
+        init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+        play(type) {
+            this.init();
+            if(this.ctx.state === 'suspended') this.ctx.resume();
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain); gain.connect(this.ctx.destination);
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            } else if (type === 'move') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.5);
+                osc.start(now); osc.stop(now + 0.5);
+            } else if (type === 'crash') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            }
+        }
+    };
+
+    const LevelSets = {
+        easy: [
+            { grid: 4, startDir: 1, map: [[0,0,0,0],[2,0,0,3],[0,0,0,0],[0,0,0,0]] },
+            { grid: 4, startDir: 1, map: [[0,0,0,3],[0,0,0,0],[2,0,0,0],[0,0,0,0]] },
+            { grid: 5, startDir: 0, map: [[3,0,0,0,2],[0,0,0,0,0],[0,0,0,0,0],[1,1,1,1,1],[0,0,0,0,0]] }
+        ],
+        normal: [
+            { grid: 5, startDir: 1, map: [[0,0,0,1,3],[0,1,0,1,0],[2,0,0,0,0],[0,1,1,1,0],[0,0,0,0,0]] },
+            { grid: 6, startDir: 1, map: [[0,0,0,0,0,0],[2,0,1,0,0,3],[1,0,1,0,1,1],[1,0,1,0,0,0],[1,0,1,1,1,0],[0,0,0,0,0,0]] },
+            { grid: 5, startDir: 1, map: [[2,0,4,0,3],[0,0,4,0,0],[0,0,4,0,0],[0,0,0,0,0],[1,1,1,1,1]] }
+        ],
+        hard: [
+            { // H1: The Spiral
+                grid: 7, startDir: 1,
+                map: [
+                    [1,1,1,1,1,1,1],
+                    [2,0,0,0,0,0,0], 
+                    [1,1,1,1,1,4,0], 
+                    [0,0,0,3,1,4,0], 
+                    [0,4,1,0,0,0,0], 
+                    [0,0,0,0,1,1,1],
+                    [1,1,1,1,1,1,1]
+                ]
+            },
+            { // H2: The Zig-Zag
+                grid: 8, startDir: 2,
+                map: [
+                    [1,1,1,1,1,1,1,1],
+                    [0,2,0,1,0,0,0,1],
+                    [1,1,0,1,0,1,0,1],
+                    [1,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,1],
+                    [1,1,1,1,1,3,1,1],
+                    [1,1,1,1,1,1,1,1]
+                ]
+            },
+            { // H3: The Minefield
+                grid: 6, startDir: 1,
+                map: [
+                    [4,4,4,4,4,4],
+                    [2,0,0,4,0,3], 
+                    [4,0,4,4,0,4],
+                    [4,0,0,0,0,4], 
+                    [4,4,4,4,4,4],
+                    [4,4,4,4,4,4]
+                ]
+            }
+        ]
+    };
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const progDisplay = document.getElementById('program-display');
+    const msgOverlay = document.getElementById('msg-overlay');
+    const startScreen = document.getElementById('start-screen');
+    
+    const Game = {
+        difficulty: 'easy',
+        levelIdx: 0,
+        commands: [],
+        isRunning: false,
+        stepInterval: null,
+        executionStep: 0,
+        bot: { x: 0, y: 0, dir: 1 }, 
+        gridSize: 0,
+        cellSize: 0,
+
+        showMenu() {
+            clearInterval(this.stepInterval);
+            this.isRunning = false;
+            msgOverlay.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+        },
+
+        start(diff) {
+            this.difficulty = diff;
+            this.loadLevel(0);
+            startScreen.classList.add('hidden');
+        },
+
+        loadLevel(idx) {
+            const set = LevelSets[this.difficulty];
+            if (idx >= set.length) {
+                document.getElementById('msg-title').innerText = "MASTER PROGRAMMER";
+                document.getElementById('msg-text').innerText = "You have completed all levels in this difficulty.";
+                document.getElementById('btn-next').classList.add('hidden');
+                document.getElementById('btn-retry').classList.add('hidden');
+                msgOverlay.classList.remove('hidden');
+                return;
+            }
+
+            this.levelIdx = idx;
+            const data = set[idx];
+            this.gridSize = data.grid;
+            this.cellSize = 450 / this.gridSize;
+            this.resetBotPosition();
+            document.getElementById('level-display').innerText = `${this.difficulty.toUpperCase()} - Level ${idx + 1}`;
+            this.clearProgram();
+            this.resetSim();
+        },
+
+        addCommand(type) {
+            if (this.isRunning) return;
+            this.commands.push(type);
+            Sfx.play('click');
+            this.updateUI();
+        },
+
+        popCommand() {
+            if (this.isRunning) return;
+            this.commands.pop();
+            Sfx.play('click');
+            this.updateUI();
+        },
+
+        clearProgram() {
+            if (this.isRunning) return;
+            this.commands = [];
+            Sfx.play('click');
+            this.updateUI();
+        },
+
+        updateUI() {
+            progDisplay.innerHTML = '';
+            this.commands.forEach((cmd, i) => {
+                const div = document.createElement('div');
+                div.className = 'cmd-line' + (i === this.executionStep && this.isRunning ? ' active' : '');
+                let icon = '';
+                if(cmd === 'MOVE') icon = '▲ FORWARD';
+                if(cmd === 'LEFT') icon = '↺ TURN LEFT';
+                if(cmd === 'RIGHT') icon = '↻ TURN RIGHT';
+                div.innerHTML = `<span class="line-num">${i+1}</span> ${icon}`;
+                progDisplay.appendChild(div);
+            });
+            if (!this.isRunning) progDisplay.scrollTop = progDisplay.scrollHeight;
+        },
+
+        run() {
+            if (this.isRunning || this.commands.length === 0) return;
+            this.isRunning = true;
+            this.executionStep = 0;
+            this.resetBotPosition();
+            this.updateUI();
+            this.render();
+            this.stepInterval = setInterval(() => {
+                this.executeStep();
+            }, 500);
+        },
+
+        resetSim() {
+            clearInterval(this.stepInterval);
+            this.isRunning = false;
+            this.executionStep = -1;
+            this.resetBotPosition();
+            this.updateUI();
+            this.render();
+            msgOverlay.classList.add('hidden');
+        },
+
+        resetBotPosition() {
+            const data = LevelSets[this.difficulty][this.levelIdx];
+            for(let y=0; y<data.grid; y++) {
+                for(let x=0; x<data.grid; x++) {
+                    if (data.map[y][x] === 2) {
+                        this.bot.x = x;
+                        this.bot.y = y;
+                    }
+                }
+            }
+            this.bot.dir = data.startDir;
+        },
+
+        executeStep() {
+            if (this.executionStep >= this.commands.length) {
+                this.finishRun(false, "Program ended. Goal not reached.");
+                return;
+            }
+
+            const cmd = this.commands[this.executionStep];
+            
+            if (cmd === 'LEFT') {
+                this.bot.dir = (this.bot.dir + 3) % 4;
+            } else if (cmd === 'RIGHT') {
+                this.bot.dir = (this.bot.dir + 1) % 4;
+            } else if (cmd === 'MOVE') {
+                let nx = this.bot.x;
+                let ny = this.bot.y;
+                if(this.bot.dir === 0) ny--;
+                if(this.bot.dir === 1) nx++;
+                if(this.bot.dir === 2) ny++;
+                if(this.bot.dir === 3) nx--;
+
+                if (nx < 0 || nx >= this.gridSize || ny < 0 || ny >= this.gridSize) {
+                    this.finishRun(false, "Crash! Out of bounds.");
+                    Sfx.play('crash');
+                    return;
+                }
+                const cell = LevelSets[this.difficulty][this.levelIdx].map[ny][nx];
+                if (cell === 1) {
+                    this.finishRun(false, "Crash! Hit a wall.");
+                    Sfx.play('crash');
+                    return;
+                }
+                this.bot.x = nx;
+                this.bot.y = ny;
+            }
+            
+            Sfx.play('move');
+            this.updateUI();
+            this.render();
+
+            const currentCell = LevelSets[this.difficulty][this.levelIdx].map[this.bot.y][this.bot.x];
+            if (currentCell === 3) {
+                this.finishRun(true, "Goal Reached!");
+            } else if (currentCell === 4) {
+                this.finishRun(false, "Bot fell into a pit!");
+                Sfx.play('crash');
+            }
+            this.executionStep++;
+        },
+
+        finishRun(success, msg) {
+            clearInterval(this.stepInterval);
+            this.isRunning = false;
+            const title = document.getElementById('msg-title');
+            const text = document.getElementById('msg-text');
+            const btnNext = document.getElementById('btn-next');
+            const btnRetry = document.getElementById('btn-retry');
+
+            text.innerText = msg;
+            msgOverlay.classList.remove('hidden');
+
+            if (success) {
+                Sfx.play('win');
+                title.innerText = "SUCCESS";
+                title.className = "win-title";
+                btnNext.classList.remove('hidden');
+                btnRetry.classList.add('hidden');
+            } else {
+                title.innerText = "ERROR";
+                title.className = "fail-title";
+                btnNext.classList.add('hidden');
+                btnRetry.classList.remove('hidden');
+            }
+        },
+
+        nextLevel() {
+            this.loadLevel(this.levelIdx + 1);
+        },
+
+        retryLevel() {
+            this.resetSim();
+        },
+
+        render() {
+            ctx.fillStyle = "#222";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const map = LevelSets[this.difficulty][this.levelIdx].map;
+            const sz = this.cellSize;
+
+            for(let y=0; y<this.gridSize; y++) {
+                for(let x=0; x<this.gridSize; x++) {
+                    const cell = map[y][x];
+                    const px = x * sz;
+                    const py = y * sz;
+                    ctx.strokeStyle = "#333";
+                    ctx.strokeRect(px, py, sz, sz);
+
+                    if (cell === 1) { // Wall
+                        ctx.fillStyle = "#555";
+                        ctx.fillRect(px + 2, py + 2, sz - 4, sz - 4);
+                    } else if (cell === 2) { // Start
+                        ctx.fillStyle = "rgba(84, 160, 255, 0.2)";
+                        ctx.fillRect(px + 5, py + 5, sz - 10, sz - 10);
+                    } else if (cell === 3) { // Goal
+                        ctx.fillStyle = "rgba(29, 209, 161, 0.4)";
+                        ctx.fillRect(px + 5, py + 5, sz - 10, sz - 10);
+                        ctx.strokeStyle = "#1dd1a1";
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(px + 8, py + 8, sz - 16, sz - 16);
+                    } else if (cell === 4) { // Pit
+                        ctx.fillStyle = "#331111";
+                        ctx.fillRect(px + 2, py + 2, sz - 4, sz - 4);
+                        ctx.strokeStyle = "#ff6b6b";
+                        ctx.beginPath();
+                        ctx.moveTo(px+10, py+10); ctx.lineTo(px+sz-10, py+sz-10);
+                        ctx.moveTo(px+sz-10, py+10); ctx.lineTo(px+10, py+sz-10);
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            const bx = this.bot.x * sz + sz/2;
+            const by = this.bot.y * sz + sz/2;
+            ctx.save();
+            ctx.translate(bx, by);
+            const rotation = ((this.bot.dir * 90) - 90) * (Math.PI/180);
+            ctx.rotate(rotation);
+
+            ctx.fillStyle = "#54a0ff";
+            ctx.beginPath();
+            ctx.moveTo(sz/2.5, 0); 
+            ctx.lineTo(-sz/3, sz/3);
+            ctx.lineTo(-sz/4, 0);
+            ctx.lineTo(-sz/3, -sz/3);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+    };
+    
+    Game.showMenu();
+
+</script>
+</body>
+</html>

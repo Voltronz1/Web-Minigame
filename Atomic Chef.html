@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atomic Chef: Remastered</title>
+    <style>
+        :root {
+            --bg: #2d3436;
+            --panel: #1e272e;
+            --accent: #fab1a0;
+            --glass: rgba(255, 255, 255, 0.1);
+            --success: #00b894;
+            --danger: #d63031;
+            --warning: #fdcb6e;
+            --gold: #f1c40f;
+            
+            /* Atom Colors */
+            --c-H: #dfe6e9; --c-C: #2d3436; --c-O: #ff7675;
+            --c-N: #74b9ff; --c-Na: #a29bfe; --c-Cl: #55efc4; --c-S: #fdcb6e;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg);
+            color: white;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* LAYOUT */
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            grid-template-rows: 90px 1fr 120px;
+            
+            width: 1500px; 
+            height: 730px;
+            
+            background: var(--panel);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            position: relative;
+            border: 1px solid #444;
+        }
+
+        /* HEADER */
+        .header {
+            grid-column: 1 / -1;
+            background: rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .header-left, .header-right { display: flex; align-items: center; gap: 25px; }
+
+        .timer-badge {
+            background: var(--danger); padding: 8px 20px;
+            border-radius: 12px; font-weight: 800; font-family: monospace; font-size: 1.5rem;
+            box-shadow: 0 0 10px rgba(214, 48, 49, 0.4);
+            transition: background 0.3s;
+            min-width: 90px; text-align: center;
+        }
+        .mode-badge {
+            font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: #888;
+        }
+        .btn-exit {
+            background: transparent; border: 1px solid #636e72; color: #888;
+            padding: 8px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer;
+            text-transform: uppercase; font-weight: bold; transition: 0.2s;
+        }
+        .btn-exit:hover { border-color: var(--danger); color: var(--danger); }
+
+        .score-box { font-weight: bold; color: var(--success); transition: color 0.2s; font-size: 1.2rem; }
+        .score-penalty { animation: shake 0.3s; color: var(--danger) !important; }
+
+        /* LEFT: LAB AREA */
+        .lab-area {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            padding-bottom: 10px;
+            background: radial-gradient(circle at 50% 30%, #353b48 0%, #1e272e 100%);
+        }
+
+        /* RECIPE CARD */
+        .recipe-card {
+            position: absolute; 
+            top: 30px; 
+            left: 20px; 
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            padding: 20px 30px; border-radius: 16px;
+            border-left: 6px solid var(--accent);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            min-width: 220px;
+        }
+        .recipe-title { font-size: 1rem; color: #aaa; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+        .recipe-name { font-size: 2.2rem; font-weight: 800; margin-bottom: 5px; }
+        .recipe-formula { font-family: 'Courier New', monospace; font-size: 1.6rem; color: var(--accent); font-weight: bold; }
+        .recipe-formula.masked { color: #555; letter-spacing: 5px; }
+
+        /* THE BEAKER */
+        .beaker-wrapper {
+            position: relative;
+            width: 300px;
+            height: 420px;
+            margin-bottom: 10px;
+        }
+        
+        .beaker {
+            width: 100%; height: 100%;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: none;
+            border-radius: 0 0 40px 40px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-wrap: wrap-reverse; 
+            justify-content: center;
+            align-content: flex-start;
+            padding: 15px;
+            gap: 4px;
+            box-shadow: inset 0 0 30px rgba(255,255,255,0.1);
+        }
+        
+        .beaker::after {
+            content: ''; position: absolute; top: 10px; right: 15px; bottom: 30px; width: 20px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.4), transparent);
+            border-radius: 10px; pointer-events: none;
+        }
+
+        /* ATOMS */
+        .atom {
+            width: 55px; height: 55px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; font-size: 1.3rem;
+            color: #333;
+            box-shadow: inset -4px -4px 6px rgba(0,0,0,0.2), 0 5px 10px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.3);
+            animation: dropIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            margin: 3px;
+            position: relative;
+        }
+        .atom span { z-index: 2; }
+        .atom::before {
+            content: ''; position: absolute; top: 8px; left: 8px; width: 12px; height: 12px;
+            background: rgba(255,255,255,0.6); border-radius: 50%;
+        }
+
+        @keyframes dropIn { from { transform: translateY(-400px) scale(0.5); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+
+        .current-formula {
+            min-height: 50px; font-family: monospace; font-size: 1.8rem;
+            background: rgba(0,0,0,0.3); padding: 8px 30px; border-radius: 12px;
+            color: #ccc; letter-spacing: 2px;
+        }
+        .current-formula.blind {
+            color: #555;
+            font-style: italic;
+            font-size: 1.2rem;
+        }
+
+        /* RIGHT: PANTRY */
+        .pantry-area {
+            background: #252d35;
+            border-left: 1px solid #444;
+            padding: 25px;
+            overflow-y: auto;
+        }
+        .pantry-title { font-size: 1rem; color: #888; text-transform: uppercase; margin-bottom: 20px; font-weight: bold; }
+        
+        .element-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        .element-btn {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 15px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+            border: 1px solid transparent;
+        }
+        .element-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-3px); border-color: rgba(255,255,255,0.2); }
+        .element-btn:active { transform: scale(0.95); }
+
+        .e-symbol { width: 45px; height: 45px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #333; margin-bottom: 8px; font-size: 1.1rem; }
+        .e-name { font-size: 0.9rem; color: #ccc; }
+
+        /* CONTROLS */
+        .controls-area {
+            grid-column: 1 / -1;
+            display: flex; justify-content: center; align-items: center; gap: 20px;
+            border-top: 1px solid #444;
+            background: rgba(0,0,0,0.2);
+        }
+
+        .btn {
+            border: none; padding: 15px 40px; border-radius: 50px; font-size: 1.2rem; font-weight: 800;
+            cursor: pointer; transition: 0.2s; text-transform: uppercase;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .btn-mix { background: var(--success); color: white; padding: 18px 60px; font-size: 1.5rem; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.4); }
+        .btn-mix:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        
+        .btn-undo { background: #636e72; color: white; }
+        .btn-undo:hover { background: #b2bec3; color: #333; }
+        
+        .btn-undo.disabled { background: #353b48; color: #636e72; cursor: not-allowed; opacity: 0.6; pointer-events: none; }
+        
+        .btn-clear { background: transparent; border: 2px solid #636e72; color: #636e72; }
+        .btn-clear:hover { border-color: var(--danger); color: var(--danger); }
+
+        .btn-link { background: none; color: #aaa; text-decoration: underline; font-size: 1rem; padding: 5px; margin-top: 15px; border:none; text-transform: none; cursor: pointer; }
+        .btn-link:hover { color: white; }
+
+        /* Difficulty Buttons */
+        .difficulty-container { display: flex; gap: 15px; flex-direction: column; width: 100%; max-width: 350px; margin-bottom: 25px;}
+        .btn-diff { width: 100%; justify-content: center; padding: 20px; font-size: 1.2rem; border: 2px solid transparent; color: white; }
+        .diff-easy { background: rgba(0, 184, 148, 0.2); border-color: var(--success); }
+        .diff-easy:hover { background: var(--success); }
+        
+        .diff-norm { background: rgba(253, 203, 110, 0.2); border-color: var(--warning); }
+        .diff-norm:hover { background: var(--warning); color: #333; }
+
+        .diff-hard { background: rgba(214, 48, 49, 0.2); border-color: var(--danger); }
+        .diff-hard:hover { background: var(--danger); }
+
+        /* LEADERBOARD & INPUTS */
+        .leaderboard-table {
+            width: 100%; max-width: 500px; border-collapse: collapse; margin-bottom: 20px;
+            background: rgba(0,0,0,0.3); border-radius: 10px; overflow: hidden; font-size: 1.1rem;
+        }
+        .leaderboard-table th, .leaderboard-table td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .leaderboard-table th { background: rgba(255,255,255,0.05); color: var(--accent); font-size: 0.9rem; text-transform: uppercase; }
+        .leaderboard-table tr:last-child td { border-bottom: none; }
+        .rank-col { width: 50px; color: #888; text-align: center !important; }
+        .score-col { text-align: right !important; font-weight: bold; color: var(--success); }
+
+        .name-input {
+            background: rgba(0,0,0,0.3); border: 2px solid #555; color: white;
+            padding: 15px 25px; font-size: 1.4rem; border-radius: 8px; text-align: center;
+            width: 250px; margin-bottom: 15px; outline: none; text-transform: uppercase;
+        }
+        .name-input:focus { border-color: var(--accent); }
+        
+        .lb-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .lb-tab { padding: 8px 20px; border-radius: 20px; background: rgba(255,255,255,0.1); cursor: pointer; font-size: 1rem; }
+        .lb-tab.active { background: var(--accent); color: #2d3436; font-weight: bold; }
+
+        /* SCREENS & ANIMATIONS */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(30, 39, 46, 0.98); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .hidden { display: none; }
+        
+        .title-win { color: var(--gold); text-shadow: 0 0 20px rgba(241, 196, 15, 0.5); }
+        .title-loss { color: var(--danger); text-shadow: 0 0 20px rgba(214, 48, 49, 0.5); }
+
+        .flash-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: white; opacity: 0; pointer-events: none; z-index: 50;
+        }
+        @keyframes flash { 0% { opacity: 0.8; } 100% { opacity: 0; } }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        .shake { animation: shake 0.3s; }
+
+    </style>
+</head>
+<body>
+
+<div class="game-layout">
+
+    <div id="start-screen" class="screen">
+        <h1 style="font-size: 4rem; margin-bottom: 0;">ATOMIC CHEF</h1>
+        <p style="color: var(--accent); margin-bottom: 3rem; font-size: 1.5rem;">REMASTERED</p>
+        
+        <p style="margin-bottom: 15px; color: #aaa;">SELECT DIFFICULTY</p>
+        <div class="difficulty-container">
+            <button class="btn btn-diff diff-easy" onclick="game.start('easy')">Intern (Goal: 10)</button>
+            <button class="btn btn-diff diff-norm" onclick="game.start('normal')">Chemist (Goal: 15)</button>
+            <button class="btn btn-diff diff-hard" onclick="game.start('hard')">Mad Scientist (Goal: 20)</button>
+        </div>
+        <button class="btn-link" onclick="leaderboard.show()">🏆 View Leaderboards</button>
+        <button class="btn-link" onclick="window.location.href='index.html'" style="display: block; margin-top: 15px; color: #3498db;">↩ Back to Main Menu</button>
+    </div>
+
+    <div id="leaderboard-screen" class="screen hidden">
+        <h2 style="color: var(--accent); margin-bottom: 30px; font-size: 2.5rem;">HALL OF FAME</h2>
+        <div class="lb-tabs">
+            <div class="lb-tab" id="tab-easy" onclick="leaderboard.render('easy')">Easy</div>
+            <div class="lb-tab" id="tab-normal" onclick="leaderboard.render('normal')">Normal</div>
+            <div class="lb-tab" id="tab-hard" onclick="leaderboard.render('hard')">Hard</div>
+        </div>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th class="rank-col">#</th>
+                    <th>Name</th>
+                    <th class="score-col">Score</th>
+                </tr>
+            </thead>
+            <tbody id="lb-body">
+            </tbody>
+        </table>
+        <button class="btn btn-mix" onclick="window.location.href='index.html'">Back to Menu</button>
+    </div>
+
+    <div id="end-screen" class="screen hidden">
+        <h1 id="end-title" style="font-size: 4rem; margin-bottom: 10px;">GAME OVER</h1>
+        <div style="font-size: 1.5rem; margin-bottom: 10px;">
+            Final Score: <span id="final-score" style="color: white; font-weight: bold;">0</span>
+        </div>
+        <p id="final-mode" style="color: #aaa; margin-top: 0; margin-bottom: 40px; font-size: 1.2rem;">Mode: Normal</p>
+        
+        <div id="new-record-area" class="hidden">
+            <p style="color: var(--warning); font-weight: bold; margin-bottom: 10px; font-size: 1.2rem;">⭐ NEW HIGH SCORE! ⭐</p>
+            <input type="text" id="player-name" class="name-input" placeholder="YOUR NAME" maxlength="10">
+            <button class="btn btn-mix" onclick="leaderboard.saveCurrent()">Save Record</button>
+        </div>
+
+        <button id="restart-btn" class="btn btn-mix" onclick="window.location.href='index.html'">Back to Main Menu</button>
+    </div>
+
+    <div id="flash" class="flash-overlay"></div>
+
+    <div class="header">
+        <div class="header-left">
+            <div class="timer-badge" id="timer">60</div>
+            <div class="mode-badge" id="mode-display">NORMAL</div>
+        </div>
+        
+        <div class="header-right">
+            <div>SCORE: <span id="score" class="score-box">0</span> / <span id="target-score">10</span></div>
+            <button class="btn-exit" onclick="game.exit()">Exit</button>
+        </div>
+    </div>
+
+    <div class="lab-area">
+        <div class="recipe-card">
+            <div class="recipe-title">Target Compound</div>
+            <div class="recipe-name" id="r-name">Water</div>
+            <div class="recipe-formula" id="r-formula">H₂O</div>
+        </div>
+
+        <div class="beaker-wrapper">
+            <div class="beaker" id="beaker">
+            </div>
+        </div>
+
+        <div class="current-formula" id="current-formula">Empty</div>
+    </div>
+
+    <div class="pantry-area">
+        <div class="pantry-title">Elements</div>
+        <div class="element-grid" id="pantry-grid">
+            </div>
+    </div>
+
+    <div class="controls-area">
+        <button class="btn btn-clear" onclick="game.clearAll()">Clear (Cost: 2)</button>
+        <button class="btn btn-undo" id="btn-undo" onclick="game.undo()">↩ Undo</button>
+        <button class="btn btn-mix" onclick="game.mix()">⚡ SYNTHESIZE</button>
+    </div>
+
+</div>
+
+<script>
+    // --- AUDIO ENGINE (UPDATED WITH CLICK SOUND) ---
+    const sfx = {
+        ctx: null,
+        init: function() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+        play: function(type) {
+            this.init();
+            if(this.ctx.state === 'suspended') this.ctx.resume();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const now = this.ctx.currentTime;
+            
+            osc.connect(gain); gain.connect(this.ctx.destination);
+
+            if (type === 'drop') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600 + Math.random()*200, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'success') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'click') {
+                // NEW CLICK SOUND
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now); osc.stop(now + 0.05);
+            }
+        }
+    };
+
+    // --- LEADERBOARD ENGINE ---
+    const leaderboard = {
+        data: { easy: [], normal: [], hard: [] },
+        
+        init: function() {
+            const stored = localStorage.getItem('atomic_chef_scores');
+            if (stored) {
+                this.data = JSON.parse(stored);
+            }
+        },
+
+        isHighScore: function(mode, score) {
+            if (score <= 0) return false;
+            const list = this.data[mode];
+            if (list.length < 5) return true;
+            return score > list[list.length - 1].score;
+        },
+
+        saveCurrent: function() {
+            const nameInput = document.getElementById('player-name');
+            const name = nameInput.value.trim() || "Anonymous";
+            
+            const mode = game.mode;
+            const score = game.score;
+
+            this.data[mode].push({ name, score });
+            this.data[mode].sort((a, b) => b.score - a.score);
+            this.data[mode] = this.data[mode].slice(0, 5);
+
+            localStorage.setItem('atomic_chef_scores', JSON.stringify(this.data));
+            
+            document.getElementById('end-screen').classList.add('hidden');
+            this.show();
+        },
+
+        show: function() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('leaderboard-screen').classList.remove('hidden');
+            this.init();
+            this.render('normal');
+        },
+
+        render: function(mode) {
+            ['easy', 'normal', 'hard'].forEach(m => {
+                const el = document.getElementById('tab-' + m);
+                if (m === mode) el.classList.add('active');
+                else el.classList.remove('active');
+            });
+
+            const tbody = document.getElementById('lb-body');
+            tbody.innerHTML = '';
+            
+            const list = this.data[mode];
+            if (list.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#555;">No records yet</td></tr>';
+                return;
+            }
+
+            list.forEach((entry, i) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="rank-col">${i+1}</td>
+                    <td>${entry.name}</td>
+                    <td class="score-col">${entry.score}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+    };
+
+    // --- DATA ---
+    const levels = {
+        easy: [
+            { n: "Water", f: "H₂O", r: {H:2, O:1} },
+            { n: "Salt", f: "NaCl", r: {Na:1, Cl:1} },
+            { n: "Oxygen Gas", f: "O₂", r: {O:2} },
+            { n: "Nitrogen Gas", f: "N₂", r: {N:2} },
+            { n: "Carbon Monoxide", f: "CO", r: {C:1, O:1} }
+        ],
+        medium: [
+            { n: "Carbon Dioxide", f: "CO₂", r: {C:1, O:2} },
+            { n: "Methane", f: "CH₄", r: {C:1, H:4} },
+            { n: "Ammonia", f: "NH₃", r: {N:1, H:3} },
+            { n: "Formaldehyde", f: "CH₂O", r: {C:1, H:2, O:1} },
+            { n: "Hydrogen Sulfide", f: "H₂S", r: {H:2, S:1} }
+        ],
+        hard: [
+            { n: "Sulfuric Acid", f: "H₂SO₄", r: {H:2, S:1, O:4} },
+            { n: "Acetylene", f: "C₂H₂", r: {C:2, H:2} },
+            { n: "Hydrazine", f: "N₂H₄", r: {N:2, H:4} },
+            { n: "Ethanol (Part)", f: "C₂H₆O", r: {C:2, H:6, O:1} },
+            { n: "Nitrous Oxide", f: "N₂O", r: {N:2, O:1} }
+        ]
+    };
+
+    const difficultySettings = {
+        easy:   { time: 90, bonus: 8, penalty: 2, allowUndo: true,  showFormula: true, showCurrent: true, shuffle: false, suddenDeath: false, name: "INTERN", quota: 10 },
+        normal: { time: 50, bonus: 5, penalty: 5, allowUndo: false, showFormula: true, showCurrent: false, shuffle: true, suddenDeath: false, name: "CHEMIST", quota: 15 },
+        hard:   { time: 35, bonus: 3, penalty: 0, allowUndo: false, showFormula: false, showCurrent: false, shuffle: true, suddenDeath: true, name: "MAD SCIENTIST", quota: 20 }
+    };
+
+    // --- GAME ENGINE ---
+    const game = {
+        timer: 60,
+        score: 0,
+        mode: 'normal',
+        atoms: [], 
+        target: null,
+        interval: null,
+        
+        dom: {
+            start: document.getElementById('start-screen'),
+            end: document.getElementById('end-screen'),
+            endTitle: document.getElementById('end-title'),
+            beaker: document.getElementById('beaker'),
+            flash: document.getElementById('flash'),
+            timer: document.getElementById('timer'),
+            score: document.getElementById('score'),
+            targetScore: document.getElementById('target-score'),
+            finalScore: document.getElementById('final-score'),
+            finalMode: document.getElementById('final-mode'),
+            modeDisplay: document.getElementById('mode-display'),
+            rName: document.getElementById('r-name'),
+            rFormula: document.getElementById('r-formula'),
+            cFormula: document.getElementById('current-formula'),
+            btnUndo: document.getElementById('btn-undo'),
+            newRecordArea: document.getElementById('new-record-area'),
+            restartBtn: document.getElementById('restart-btn'),
+            pantryGrid: document.getElementById('pantry-grid')
+        },
+
+        start: function(selectedMode) {
+            this.mode = selectedMode;
+            const settings = difficultySettings[this.mode];
+            
+            this.timer = settings.time;
+            this.score = 0;
+            this.atoms = [];
+            
+            this.dom.start.classList.add('hidden');
+            this.dom.end.classList.add('hidden');
+            
+            this.dom.modeDisplay.innerText = settings.name;
+            this.dom.targetScore.innerText = settings.quota; // Show Quota
+
+            if(this.mode === 'easy') this.dom.modeDisplay.style.color = 'var(--success)';
+            if(this.mode === 'normal') this.dom.modeDisplay.style.color = 'var(--warning)';
+            if(this.mode === 'hard') this.dom.modeDisplay.style.color = 'var(--danger)';
+
+            if(settings.allowUndo) {
+                this.dom.btnUndo.classList.remove('disabled');
+                this.dom.btnUndo.innerText = "↩ Undo (Cost: 1)";
+            } else {
+                this.dom.btnUndo.classList.add('disabled');
+                this.dom.btnUndo.innerText = "↩ Undo (Locked)";
+            }
+
+            this.sortPantryOriginal();
+            this.updateHUD();
+            this.renderBeaker();
+            this.pickRecipe();
+            
+            leaderboard.init();
+
+            clearInterval(this.interval);
+            this.interval = setInterval(() => this.tick(), 1000);
+        },
+
+        exit: function() {
+            clearInterval(this.interval);
+            this.atoms = [];
+            this.renderBeaker();
+            this.dom.start.classList.remove('hidden');
+            this.dom.end.classList.add('hidden');
+        },
+
+        tick: function() {
+            this.timer--;
+            this.dom.timer.innerText = this.timer;
+            
+            if(this.timer <= 10) this.dom.timer.style.background = 'var(--danger)';
+            else this.dom.timer.style.background = '#d63031'; 
+
+            if(this.timer <= 0) this.gameOver(false); // Time out = Loss
+        },
+
+        pickRecipe: function() {
+            let pool = [];
+
+            if (this.mode === 'easy') {
+                pool = levels.easy;
+            } 
+            else if (this.mode === 'normal') {
+                pool = levels.easy;
+                if (this.score >= 5) pool = [...pool, ...levels.medium];
+                if (this.score >= 12) pool = [...levels.medium, ...levels.hard]; 
+            }
+            else if (this.mode === 'hard') {
+                pool = [...levels.medium, ...levels.hard];
+            }
+
+            this.target = pool[Math.floor(Math.random() * pool.length)];
+            
+            this.dom.rName.innerText = this.target.n;
+            
+            const settings = difficultySettings[this.mode];
+            if (settings.showFormula) {
+                this.dom.rFormula.innerText = this.target.f;
+                this.dom.rFormula.classList.remove('masked');
+            } else {
+                this.dom.rFormula.innerText = "???";
+                this.dom.rFormula.classList.add('masked');
+            }
+        },
+
+        addAtom: function(type) {
+            if(this.atoms.length >= 25) { sfx.play('error'); return; } 
+            sfx.play('drop');
+            this.atoms.push(type);
+            this.renderBeaker();
+        },
+
+        deductScore: function(amount) {
+            if (this.score > 0) {
+                this.score = Math.max(0, this.score - amount);
+                this.dom.score.classList.remove('score-penalty');
+                void this.dom.score.offsetWidth; 
+                this.dom.score.classList.add('score-penalty');
+                this.updateHUD();
+                sfx.play('error');
+            }
+        },
+
+        undo: function() {
+            if (!difficultySettings[this.mode].allowUndo) return;
+            if(this.atoms.length === 0) return;
+
+            this.deductScore(1);
+
+            this.atoms.pop();
+            this.renderBeaker();
+        },
+
+        clearAll: function() {
+            if(this.atoms.length === 0) return;
+
+            this.deductScore(2);
+
+            this.atoms = [];
+            this.renderBeaker();
+        },
+
+        renderBeaker: function() {
+            this.dom.beaker.innerHTML = '';
+            
+            this.atoms.forEach(type => {
+                const el = document.createElement('div');
+                el.className = 'atom';
+                el.innerHTML = `<span>${type}</span>`;
+                const colors = { H:'var(--c-H)', C:'var(--c-C)', O:'var(--c-O)', N:'var(--c-N)', Na:'var(--c-Na)', Cl:'var(--c-Cl)', S:'var(--c-S)' };
+                el.style.background = colors[type];
+                if(type === 'C') el.style.color = 'white';
+                this.dom.beaker.appendChild(el);
+            });
+
+            const settings = difficultySettings[this.mode];
+            
+            if (settings.showCurrent) {
+                const counts = {};
+                this.atoms.forEach(x => counts[x] = (counts[x]||0)+1);
+                let txt = "";
+                Object.keys(counts).sort().forEach(k => {
+                    txt += k + (counts[k] > 1 ? counts[k] : "");
+                });
+                this.dom.cFormula.innerText = txt || "Empty";
+                this.dom.cFormula.classList.remove('blind');
+            } else {
+                this.dom.cFormula.innerText = this.atoms.length > 0 ? "Analyzing..." : "Empty";
+                this.dom.cFormula.classList.add('blind');
+            }
+        },
+
+        mix: function() {
+            const currentCounts = {};
+            this.atoms.forEach(x => currentCounts[x] = (currentCounts[x]||0)+1);
+            const targetCounts = this.target.r;
+
+            const k1 = Object.keys(currentCounts).sort();
+            const k2 = Object.keys(targetCounts).sort();
+            
+            let match = true;
+            if(k1.length !== k2.length) match = false;
+            else {
+                for(let k of k1) {
+                    if(k1[k] !== k2[k] || currentCounts[k] !== targetCounts[k]) match = false;
+                }
+            }
+
+            if(match) this.handleSuccess();
+            else this.handleFail();
+        },
+
+        handleSuccess: function() {
+            sfx.play('success');
+            this.score++;
+            this.timer += difficultySettings[this.mode].bonus;
+            
+            this.dom.flash.style.animation = 'none';
+            this.dom.flash.offsetHeight; 
+            this.dom.flash.style.animation = 'flash 0.5s';
+
+            this.atoms = [];
+            this.renderBeaker();
+            this.updateHUD();
+
+            // WIN CHECK
+            if (this.score >= difficultySettings[this.mode].quota) {
+                this.gameOver(true); // Win!
+                return;
+            }
+
+            this.pickRecipe();
+
+            if (difficultySettings[this.mode].shuffle) {
+                this.shufflePantry();
+            }
+        },
+
+        handleFail: function() {
+            if (difficultySettings[this.mode].suddenDeath) {
+                this.gameOver(false);
+                return;
+            }
+
+            sfx.play('error');
+            this.timer -= difficultySettings[this.mode].penalty;
+            this.dom.beaker.classList.add('shake');
+            setTimeout(() => this.dom.beaker.classList.remove('shake'), 300);
+        },
+
+        shufflePantry: function() {
+            const grid = this.dom.pantryGrid;
+            for (let i = grid.children.length; i >= 0; i--) {
+                grid.appendChild(grid.children[Math.random() * i | 0]);
+            }
+        },
+
+        sortPantryOriginal: function() {
+            const elements = [
+                {s:'H', n:'Hydrogen', c:'var(--c-H)', t:'black'},
+                {s:'C', n:'Carbon', c:'var(--c-C)', t:'white'},
+                {s:'O', n:'Oxygen', c:'var(--c-O)', t:'black'},
+                {s:'N', n:'Nitrogen', c:'var(--c-N)', t:'black'},
+                {s:'Na', n:'Sodium', c:'var(--c-Na)', t:'black'},
+                {s:'Cl', n:'Chlorine', c:'var(--c-Cl)', t:'black'},
+                {s:'S', n:'Sulfur', c:'var(--c-S)', t:'black'}
+            ];
+            
+            this.dom.pantryGrid.innerHTML = '';
+            elements.forEach(e => {
+                const div = document.createElement('div');
+                div.className = 'element-btn';
+                
+                // --- CLICK HANDLER (UPDATED) ---
+                div.onclick = () => {
+                    sfx.play('click'); // Play sound
+                    this.addAtom(e.s); // Add atom
+                };
+                
+                div.innerHTML = `
+                    <div class="e-symbol" style="background: ${e.c}; color: ${e.t}">${e.s}</div>
+                    <div class="e-name">${e.n}</div>
+                `;
+                this.dom.pantryGrid.appendChild(div);
+            });
+        },
+
+        updateHUD: function() {
+            this.dom.score.innerText = this.score;
+        },
+
+        gameOver: function(isWin) {
+            clearInterval(this.interval);
+            
+            // Set dynamic Title
+            if (isWin) {
+                this.dom.endTitle.innerText = "YOU WIN!";
+                this.dom.endTitle.className = "title-win";
+            } else {
+                this.dom.endTitle.innerText = "GAME OVER";
+                this.dom.endTitle.className = "title-loss";
+            }
+
+            this.dom.finalScore.innerText = this.score;
+            this.dom.finalMode.innerText = "Difficulty: " + difficultySettings[this.mode].name;
+            this.dom.end.classList.remove('hidden');
+
+            if(leaderboard.isHighScore(this.mode, this.score)) {
+                this.dom.newRecordArea.classList.remove('hidden');
+                this.dom.restartBtn.classList.add('hidden');
+                document.getElementById('player-name').focus();
+            } else {
+                this.dom.newRecordArea.classList.add('hidden');
+                this.dom.restartBtn.classList.remove('hidden');
+            }
+        }
+    };
+
+    leaderboard.init();
+
+</script>
+</body>
+</html>

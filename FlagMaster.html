@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlagMaster: Ultimate Edition</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4895ef;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #f72585;
+            --dark: #2b2d42;
+            --light: #f8f9fa;
+            --gold: #ffd700;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; user-select: none; }
+
+        body {
+            background: linear-gradient(135deg, #1e1e2f 0%, #2b2d42 100%);
+            color: var(--light);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Canvas for Confetti */
+        #confetti-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        /* Container */
+        .app-container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        h1 { 
+            margin-bottom: 0.5rem; 
+            font-weight: 800; 
+            letter-spacing: 1px; 
+            text-transform: uppercase; 
+            background: linear-gradient(to right, #4cc9f0, #4361ee); 
+            -webkit-background-clip: text; 
+            background-clip: text; 
+            color: transparent; /* Fallback for background-clip */
+            -webkit-text-fill-color: transparent;
+        }
+        
+        p { color: #a0a0a0; margin-bottom: 1.5rem; }
+
+        /* Screens */
+        .screen { display: none; animation: fadeIn 0.4s ease; }
+        .screen.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Buttons */
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            margin: 5px;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(67, 97, 238, 0.3);
+        }
+        .btn:hover { transform: translateY(-2px); background: var(--secondary); }
+        .btn:active { transform: translateY(0); }
+        
+        /* Difficulty Buttons */
+        .diff-btn { width: 100%; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; text-align: left; }
+        .diff-easy { border-left: 5px solid var(--success); }
+        .diff-normal { border-left: 5px solid var(--accent); }
+        .diff-hard { border-left: 5px solid var(--danger); }
+        .high-score-tag { font-size: 0.7rem; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px; color: var(--gold); }
+
+        /* HUD */
+        .hud { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem; font-weight: bold; color: var(--accent); }
+        .streak-container { font-size: 0.9rem; color: var(--warning); display: flex; align-items: center; gap: 5px; opacity: 0; transition: opacity 0.3s; }
+        .streak-container.active { opacity: 1; }
+        .streak-flame { font-size: 1.2rem; animation: flicker 1s infinite alternate; }
+        @keyframes flicker { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.2); opacity: 1; } }
+
+        /* Timer */
+        .timer-container { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin-bottom: 1.5rem; overflow: hidden; }
+        .timer-bar { height: 100%; background: var(--success); width: 100%; transition: width 0.1s linear, background 0.3s; }
+
+        /* Flag */
+        .flag-container {
+            width: 100%; height: 200px; background: rgba(0,0,0,0.2); border-radius: 10px;
+            display: flex; justify-content: center; align-items: center; margin-bottom: 1rem;
+            position: relative; overflow: hidden; flex-direction: column;
+        }
+        .flag-img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 5px 15px rgba(0,0,0,0.5); border-radius: 4px; z-index: 2; }
+        
+        /* Context Info (Educational) */
+        .info-pill {
+            margin-top: -10px; margin-bottom: 15px;
+            background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 15px;
+            font-size: 0.8rem; color: #ccc; opacity: 0; transform: translateY(-5px);
+            transition: all 0.3s; display: inline-block;
+        }
+        .info-pill.visible { opacity: 1; transform: translateY(0); margin-top: 5px; }
+
+        /* Options */
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .option-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.05);
+            padding: 15px 5px; font-size: 0.95rem; border-radius: 10px; color: white;
+            transition: all 0.1s; height: 100%; display: flex; align-items: center; justify-content: center; line-height: 1.2; cursor: pointer;
+        }
+        .option-btn:hover { background: rgba(255,255,255,0.2); }
+        .correct-anim { background: var(--success) !important; border-color: var(--success); color: white; animation: pulse 0.4s; }
+        .wrong-anim { background: var(--danger) !important; border-color: var(--danger); color: white; animation: shake 0.4s; }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+        /* Quit Button */
+        .quit-btn { background: transparent; border: 1px solid rgba(231, 76, 60, 0.5); color: var(--danger); padding: 8px 20px; border-radius: 50px; font-size: 0.85rem; cursor: pointer; margin-top: 20px; transition: all 0.2s; opacity: 0.7; }
+        .quit-btn:hover { background: var(--danger); color: white; opacity: 1; }
+
+        /* Survival Toggle */
+        .mode-toggle { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--warning); }
+        input:checked + .slider:before { transform: translateX(20px); }
+        .mode-label { font-size: 0.9rem; font-weight: bold; }
+        .mode-desc { font-size: 0.7rem; color: #aaa; display: block; margin-top: 2px; }
+
+        /* End Screen */
+        .stars { font-size: 3rem; margin: 1rem 0; color: #444; letter-spacing: 5px; transition: color 0.5s; }
+        .stars.gold { color: var(--gold); text-shadow: 0 0 15px rgba(255, 215, 0, 0.5); }
+        .score-box { background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 10px; margin-bottom: 1.5rem; }
+        .score-val { font-size: 2rem; font-weight: bold; color: var(--primary); }
+
+    </style>
+</head>
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+
+<div class="app-container">
+    
+    <div id="start-screen" class="screen active">
+        <h1>FLAG MASTER</h1>
+        <p>Global Geography Challenge</p>
+        
+        <div class="mode-toggle">
+            <div>
+                <span class="mode-label">Sudden Death Mode</span>
+                <span class="mode-desc">Infinite levels. One mistake = Game Over.</span>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="survival-check">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div style="text-align: left; margin-top: 10px;">
+            <button class="btn diff-btn diff-easy" onclick="game.start('easy')">
+                <div><span>Easy</span> <div style="font-size: 0.7rem; opacity: 0.7">Superpowers & Famous</div></div>
+                <span id="best-easy" class="high-score-tag">Best: 0</span>
+            </button>
+            <button class="btn diff-btn diff-normal" onclick="game.start('normal')">
+                <div><span>Normal</span> <div style="font-size: 0.7rem; opacity: 0.7">Similarity Traps</div></div>
+                <span id="best-normal" class="high-score-tag">Best: 0</span>
+            </button>
+            <button class="btn diff-btn diff-hard" onclick="game.start('hard')">
+                <div><span>Hard</span> <div style="font-size: 0.7rem; opacity: 0.7">Obscure & Tiny</div></div>
+                <span id="best-hard" class="high-score-tag">Best: 0</span>
+            </button>
+        </div>
+        <button class="quit-btn" onclick="window.location.href='index.html'" style="width: 100%; margin-top: 15px; border-color: rgba(52, 152, 219, 0.5); color: #3498db;">↩ Back to Main Menu</button>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div class="hud">
+            <span id="level-display">Level 1/10</span>
+            <div id="streak-display" class="streak-container">
+                <span class="streak-flame">🔥</span> <span id="streak-val">x1</span>
+            </div>
+            <span id="score-display">Score: 0</span>
+        </div>
+        
+        <div class="timer-container">
+            <div id="timer-bar" class="timer-bar"></div>
+        </div>
+
+        <div class="flag-container">
+            <img id="flag-img" class="flag-img" src="" alt="Guess the flag">
+        </div>
+        
+        <div id="info-pill" class="info-pill">Capital: Paris • Europe</div>
+
+        <div id="options-container" class="options-grid">
+            </div>
+
+        <button class="quit-btn" onclick="game.quit()">✕ Quit Game</button>
+        <button class="quit-btn" onclick="window.location.href='index.html'" style="margin-left: 10px; border-color: rgba(52, 152, 219, 0.5); color: #3498db;">↩ Back to Menu</button>
+    </div>
+
+    <div id="end-screen" class="screen">
+        <h1 id="end-title">GAME OVER</h1>
+        <div id="end-message">Well Played!</div>
+        
+        <div class="stars" id="star-display">★★★</div>
+        
+        <div class="options-grid" style="margin-bottom: 1.5rem;">
+            <div class="score-box">
+                <div class="score-val" id="final-score">0</div>
+                <div class="score-label">Final Score</div>
+            </div>
+            <div class="score-box">
+                <div class="score-val" id="final-accuracy">0%</div>
+                <div class="score-label">Accuracy</div>
+            </div>
+        </div>
+
+        <button class="btn" onclick="game.switchScreen('start')">Play Again</button>
+        <button class="quit-btn" onclick="window.location.href='index.html'" style="margin-top: 10px; border-color: rgba(52, 152, 219, 0.5); color: #3498db;">↩ Back to Menu</button>
+    </div>
+
+</div>
+
+<script>
+    // --- AUDIO SYSTEM (Web Audio API) ---
+    const audio = {
+        ctx: null,
+        init: function() {
+            if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        },
+        playTone: function(freq, type, duration, vol = 0.1) {
+            if(!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        },
+        playCorrect: function() {
+            this.init();
+            // Ding!
+            this.playTone(600, 'sine', 0.1);
+            setTimeout(() => this.playTone(800, 'sine', 0.3), 100);
+        },
+        playWrong: function() {
+            this.init();
+            // Buzz
+            this.playTone(150, 'sawtooth', 0.4, 0.2);
+        },
+        playClick: function() {
+            this.init();
+            this.playTone(400, 'triangle', 0.05, 0.05);
+        },
+        playWin: function() {
+            this.init();
+            [0, 200, 400].forEach((delay, i) => {
+                setTimeout(() => this.playTone(500 + (i*200), 'square', 0.2, 0.1), delay);
+            });
+        }
+    };
+
+    // --- DATA (Greatly Expanded) ---
+    const db = {
+        easy: [
+            {code: 'us', name: 'United States', capital: 'Washington, D.C.', region: 'N. America'},
+            {code: 'gb', name: 'United Kingdom', capital: 'London', region: 'Europe'},
+            {code: 'jp', name: 'Japan', capital: 'Tokyo', region: 'Asia'},
+            {code: 'fr', name: 'France', capital: 'Paris', region: 'Europe'},
+            {code: 'de', name: 'Germany', capital: 'Berlin', region: 'Europe'},
+            {code: 'ca', name: 'Canada', capital: 'Ottawa', region: 'N. America'},
+            {code: 'br', name: 'Brazil', capital: 'Brasília', region: 'S. America'},
+            {code: 'it', name: 'Italy', capital: 'Rome', region: 'Europe'},
+            {code: 'cn', name: 'China', capital: 'Beijing', region: 'Asia'},
+            {code: 'au', name: 'Australia', capital: 'Canberra', region: 'Oceania'},
+            {code: 'in', name: 'India', capital: 'New Delhi', region: 'Asia'},
+            {code: 'kr', name: 'South Korea', capital: 'Seoul', region: 'Asia'},
+            {code: 'es', name: 'Spain', capital: 'Madrid', region: 'Europe'},
+            {code: 'ru', name: 'Russia', capital: 'Moscow', region: 'Europe/Asia'},
+            {code: 'mx', name: 'Mexico', capital: 'Mexico City', region: 'N. America'},
+            {code: 'ar', name: 'Argentina', capital: 'Buenos Aires', region: 'S. America'},
+            {code: 'ch', name: 'Switzerland', capital: 'Bern', region: 'Europe'},
+            {code: 'eg', name: 'Egypt', capital: 'Cairo', region: 'Africa'},
+            {code: 'gr', name: 'Greece', capital: 'Athens', region: 'Europe'},
+            {code: 'nl', name: 'Netherlands', capital: 'Amsterdam', region: 'Europe'},
+            // New additions
+            {code: 'be', name: 'Belgium', capital: 'Brussels', region: 'Europe'},
+            {code: 'se', name: 'Sweden', capital: 'Stockholm', region: 'Europe'},
+            {code: 'pt', name: 'Portugal', capital: 'Lisbon', region: 'Europe'},
+            {code: 'tr', name: 'Turkey', capital: 'Ankara', region: 'Asia/Europe'},
+            {code: 'za', name: 'South Africa', capital: 'Pretoria', region: 'Africa'},
+            {code: 'sa', name: 'Saudi Arabia', capital: 'Riyadh', region: 'Asia'},
+            {code: 'ae', name: 'UAE', capital: 'Abu Dhabi', region: 'Asia'},
+            {code: 'il', name: 'Israel', capital: 'Jerusalem', region: 'Asia'},
+            {code: 'jm', name: 'Jamaica', capital: 'Kingston', region: 'N. America'},
+            {code: 'cu', name: 'Cuba', capital: 'Havana', region: 'N. America'},
+            {code: 'co', name: 'Colombia', capital: 'Bogotá', region: 'S. America'},
+            {code: 'cl', name: 'Chile', capital: 'Santiago', region: 'S. America'}
+        ],
+        normal: [
+            {code: 'ie', name: 'Ireland', capital: 'Dublin', region: 'Europe'},
+            {code: 'ci', name: 'Ivory Coast', capital: 'Yamoussoukro', region: 'Africa'},
+            {code: 'id', name: 'Indonesia', capital: 'Jakarta', region: 'Asia'},
+            {code: 'mc', name: 'Monaco', capital: 'Monaco', region: 'Europe'},
+            {code: 'nz', name: 'New Zealand', capital: 'Wellington', region: 'Oceania'},
+            {code: 'td', name: 'Chad', capital: 'N\'Djamena', region: 'Africa'},
+            {code: 'ro', name: 'Romania', capital: 'Bucharest', region: 'Europe'},
+            {code: 'ec', name: 'Ecuador', capital: 'Quito', region: 'S. America'},
+            {code: 've', name: 'Venezuela', capital: 'Caracas', region: 'S. America'},
+            {code: 'ml', name: 'Mali', capital: 'Bamako', region: 'Africa'},
+            {code: 'gn', name: 'Guinea', capital: 'Conakry', region: 'Africa'},
+            {code: 'pl', name: 'Poland', capital: 'Warsaw', region: 'Europe'},
+            {code: 'sg', name: 'Singapore', capital: 'Singapore', region: 'Asia'},
+            {code: 'fi', name: 'Finland', capital: 'Helsinki', region: 'Europe'},
+            {code: 'no', name: 'Norway', capital: 'Oslo', region: 'Europe'},
+            {code: 'dk', name: 'Denmark', capital: 'Copenhagen', region: 'Europe'},
+            {code: 'ua', name: 'Ukraine', capital: 'Kyiv', region: 'Europe'},
+            {code: 'my', name: 'Malaysia', capital: 'Kuala Lumpur', region: 'Asia'},
+            {code: 'th', name: 'Thailand', capital: 'Bangkok', region: 'Asia'},
+            {code: 'vn', name: 'Vietnam', capital: 'Hanoi', region: 'Asia'},
+            // New additions
+            {code: 'at', name: 'Austria', capital: 'Vienna', region: 'Europe'},
+            {code: 'ph', name: 'Philippines', capital: 'Manila', region: 'Asia'},
+            {code: 'pk', name: 'Pakistan', capital: 'Islamabad', region: 'Asia'},
+            {code: 'ng', name: 'Nigeria', capital: 'Abuja', region: 'Africa'},
+            {code: 'ke', name: 'Kenya', capital: 'Nairobi', region: 'Africa'},
+            {code: 'ma', name: 'Morocco', capital: 'Rabat', region: 'Africa'},
+            {code: 'ir', name: 'Iran', capital: 'Tehran', region: 'Asia'},
+            {code: 'iq', name: 'Iraq', capital: 'Baghdad', region: 'Asia'},
+            {code: 'cz', name: 'Czechia', capital: 'Prague', region: 'Europe'},
+            {code: 'hu', name: 'Hungary', capital: 'Budapest', region: 'Europe'},
+            {code: 'qa', name: 'Qatar', capital: 'Doha', region: 'Asia'},
+            {code: 'bd', name: 'Bangladesh', capital: 'Dhaka', region: 'Asia'}
+        ],
+        hard: [
+            {code: 'mk', name: 'North Macedonia', capital: 'Skopje', region: 'Europe'},
+            {code: 'bt', name: 'Bhutan', capital: 'Thimphu', region: 'Asia'},
+            {code: 'sz', name: 'Eswatini', capital: 'Mbabane', region: 'Africa'},
+            {code: 'ki', name: 'Kiribati', capital: 'South Tarawa', region: 'Oceania'},
+            {code: 'sc', name: 'Seychelles', capital: 'Victoria', region: 'Africa'},
+            {code: 'lc', name: 'Saint Lucia', capital: 'Castries', region: 'N. America'},
+            {code: 'np', name: 'Nepal', capital: 'Kathmandu', region: 'Asia'},
+            {code: 'lk', name: 'Sri Lanka', capital: 'Colombo', region: 'Asia'},
+            {code: 'tm', name: 'Turkmenistan', capital: 'Ashgabat', region: 'Asia'},
+            {code: 'kz', name: 'Kazakhstan', capital: 'Astana', region: 'Asia'},
+            {code: 'dm', name: 'Dominica', capital: 'Roseau', region: 'N. America'},
+            {code: 'mz', name: 'Mozambique', capital: 'Maputo', region: 'Africa'},
+            {code: 'mn', name: 'Mongolia', capital: 'Ulaanbaatar', region: 'Asia'},
+            {code: 'kg', name: 'Kyrgyzstan', capital: 'Bishkek', region: 'Asia'},
+            {code: 'cx', name: 'Christmas Island', capital: 'Flying Fish Cove', region: 'Oceania'},
+            {code: 'vc', name: 'St. Vincent', capital: 'Kingstown', region: 'N. America'},
+            {code: 'km', name: 'Comoros', capital: 'Moroni', region: 'Africa'},
+            {code: 'vu', name: 'Vanuatu', capital: 'Port Vila', region: 'Oceania'},
+            {code: 'fj', name: 'Fiji', capital: 'Suva', region: 'Oceania'},
+            {code: 'tv', name: 'Tuvalu', capital: 'Funafuti', region: 'Oceania'},
+            {code: 'tg', name: 'Togo', capital: 'Lomé', region: 'Africa'},
+            {code: 'bj', name: 'Benin', capital: 'Porto-Novo', region: 'Africa'},
+            // New Additions
+            {code: 'tj', name: 'Tajikistan', capital: 'Dushanbe', region: 'Asia'},
+            {code: 'uz', name: 'Uzbekistan', capital: 'Tashkent', region: 'Asia'},
+            {code: 'si', name: 'Slovenia', capital: 'Ljubljana', region: 'Europe'},
+            {code: 'sk', name: 'Slovakia', capital: 'Bratislava', region: 'Europe'},
+            {code: 'pw', name: 'Palau', capital: 'Ngerulmud', region: 'Oceania'},
+            {code: 'ga', name: 'Gabon', capital: 'Libreville', region: 'Africa'},
+            {code: 'ls', name: 'Lesotho', capital: 'Maseru', region: 'Africa'},
+            {code: 'sr', name: 'Suriname', capital: 'Paramaribo', region: 'S. America'},
+            {code: 'gy', name: 'Guyana', capital: 'Georgetown', region: 'S. America'},
+            {code: 'la', name: 'Laos', capital: 'Vientiane', region: 'Asia'},
+            {code: 'kh', name: 'Cambodia', capital: 'Phnom Penh', region: 'Asia'},
+            {code: 'mm', name: 'Myanmar', capital: 'Naypyidaw', region: 'Asia'}
+        ]
+    };
+
+    // --- GAME ENGINE ---
+    const game = {
+        config: {
+            questionsPerGame: 10,
+            timePerQuestion: 15,
+            baseScore: 100
+        },
+        state: {
+            score: 0,
+            currentQuestion: 0,
+            difficulty: 'easy',
+            timer: null,
+            timeLeft: 0,
+            isLocked: false,
+            correctCount: 0,
+            questionData: [],
+            streak: 0,
+            survivalMode: false
+        },
+        
+        dom: {
+            start: document.getElementById('start-screen'),
+            game: document.getElementById('game-screen'),
+            end: document.getElementById('end-screen'),
+            flag: document.getElementById('flag-img'),
+            options: document.getElementById('options-container'),
+            timerBar: document.getElementById('timer-bar'),
+            score: document.getElementById('score-display'),
+            level: document.getElementById('level-display'),
+            streakContainer: document.getElementById('streak-display'),
+            streakVal: document.getElementById('streak-val'),
+            info: document.getElementById('info-pill'),
+            survivalCheck: document.getElementById('survival-check'),
+            endTitle: document.getElementById('end-title'),
+            finalScore: document.getElementById('final-score'),
+            finalAccuracy: document.getElementById('final-accuracy'),
+            starDisplay: document.getElementById('star-display'),
+            endMessage: document.getElementById('end-message')
+        },
+
+        init: function() {
+            // Load High Scores
+            document.getElementById('best-easy').innerText = 'Best: ' + (localStorage.getItem('flag_best_easy') || 0);
+            document.getElementById('best-normal').innerText = 'Best: ' + (localStorage.getItem('flag_best_normal') || 0);
+            document.getElementById('best-hard').innerText = 'Best: ' + (localStorage.getItem('flag_best_hard') || 0);
+        },
+
+        start: function(diff) {
+            audio.playClick();
+            this.state.difficulty = diff;
+            this.state.score = 0;
+            this.state.currentQuestion = 0;
+            this.state.correctCount = 0;
+            this.state.streak = 0;
+            this.state.survivalMode = this.dom.survivalCheck.checked;
+            
+            // Prepare Data
+            let pool = [...db[diff]];
+            pool.sort(() => 0.5 - Math.random());
+            
+            if(!this.state.survivalMode) {
+                // Classic Mode
+                if(pool.length < this.config.questionsPerGame) pool = [...pool, ...pool];
+                this.state.questionData = pool.slice(0, this.config.questionsPerGame);
+            } else {
+                // Survival Mode - Use whole pool
+                this.state.questionData = pool;
+            }
+
+            this.switchScreen('game');
+            this.loadLevel();
+        },
+
+        quit: function() {
+            audio.playClick();
+            clearInterval(this.state.timer);
+            this.switchScreen('start');
+        },
+
+        loadLevel: function() {
+            this.dom.info.classList.remove('visible'); // Hide context
+            
+            // Check End Conditions
+            if (!this.state.survivalMode && this.state.currentQuestion >= this.config.questionsPerGame) {
+                this.endGame(false);
+                return;
+            }
+            // In survival, if we run out of questions, recycle them
+            if (this.state.survivalMode && this.state.currentQuestion >= this.state.questionData.length) {
+                let freshPool = [...db[this.state.difficulty]].sort(() => 0.5 - Math.random());
+                this.state.questionData = [...this.state.questionData, ...freshPool];
+            }
+
+            this.state.isLocked = false;
+            const target = this.state.questionData[this.state.currentQuestion];
+            
+            // UI Updates
+            const levelText = this.state.survivalMode ? `Level ${this.state.currentQuestion + 1} (Sudden Death)` : `Level ${this.state.currentQuestion + 1}/${this.config.questionsPerGame}`;
+            this.dom.level.innerText = levelText;
+            this.dom.score.innerText = `Score: ${this.state.score}`;
+            this.updateStreakUI();
+            
+            // Set Flag
+            this.dom.flag.src = `https://flagcdn.com/h240/${target.code}.png`;
+
+            // Logic for Options (Smart Traps)
+            let options = [target];
+            let pool = [];
+            
+            // Trap Logic
+            if (this.state.difficulty === 'normal') {
+                 if(target.code === 'ie') pool.push(db.normal.find(c => c.code === 'ci'));
+                 if(target.code === 'ci') pool.push(db.normal.find(c => c.code === 'ie'));
+                 if(target.code === 'id') pool.push(db.normal.find(c => c.code === 'mc'));
+                 if(target.code === 'mc') pool.push(db.normal.find(c => c.code === 'id'));
+                 if(target.code === 'td') pool.push(db.normal.find(c => c.code === 'ro'));
+                 if(target.code === 'ro') pool.push(db.normal.find(c => c.code === 'td'));
+                 if(['co', 'ec', 've'].includes(target.code)) {
+                     if(target.code !== 'co') pool.push(db.normal.find(c => c.code === 'co'));
+                     if(target.code !== 'ec') pool.push(db.normal.find(c => c.code === 'ec'));
+                     if(target.code !== 've') pool.push(db.normal.find(c => c.code === 've'));
+                 }
+                 pool = pool.filter(x => x !== undefined);
+            }
+
+            const fullDb = db[this.state.difficulty];
+            while (options.length + pool.length < 4) {
+                const randomC = fullDb[Math.floor(Math.random() * fullDb.length)];
+                if (!options.includes(randomC) && !pool.includes(randomC) && randomC.code !== target.code) {
+                    pool.push(randomC);
+                }
+            }
+            options = [...options, ...pool].slice(0, 4).sort(() => 0.5 - Math.random());
+
+            // Render
+            this.dom.options.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerText = opt.name;
+                btn.onclick = () => this.handleAnswer(opt, btn, target);
+                this.dom.options.appendChild(btn);
+            });
+
+            this.startTimer();
+        },
+
+        updateStreakUI: function() {
+            if(this.state.streak > 1) {
+                this.dom.streakContainer.classList.add('active');
+                this.dom.streakVal.innerText = 'x' + Math.min(this.state.streak, 5); // Cap multiplier at 5 visually
+            } else {
+                this.dom.streakContainer.classList.remove('active');
+            }
+        },
+
+        startTimer: function() {
+            clearInterval(this.state.timer);
+            this.state.timeLeft = this.config.timePerQuestion;
+            this.updateTimerBar();
+
+            this.state.timer = setInterval(() => {
+                this.state.timeLeft -= 0.1;
+                this.updateTimerBar();
+
+                if(this.state.timeLeft <= 0) {
+                    clearInterval(this.state.timer);
+                    this.handleTimeout();
+                }
+            }, 100);
+        },
+
+        updateTimerBar: function() {
+            const percent = (this.state.timeLeft / this.config.timePerQuestion) * 100;
+            this.dom.timerBar.style.width = `${percent}%`;
+            if(percent > 50) this.dom.timerBar.style.background = 'var(--success)';
+            else if(percent > 20) this.dom.timerBar.style.background = 'var(--accent)';
+            else this.dom.timerBar.style.background = 'var(--danger)';
+        },
+
+        showContext: function(target) {
+            this.dom.info.innerHTML = `<strong>${target.capital}</strong> • ${target.region}`;
+            this.dom.info.classList.add('visible');
+        },
+
+        handleAnswer: function(selected, btnElement, target) {
+            if(this.state.isLocked) return;
+            this.state.isLocked = true;
+            clearInterval(this.state.timer);
+            this.showContext(target);
+
+            if (selected.code === target.code) {
+                // Correct
+                audio.playCorrect();
+                btnElement.classList.add('correct-anim');
+                
+                // Scoring
+                this.state.streak++;
+                let multiplier = 1;
+                if(this.state.streak >= 2) multiplier = 2;
+                if(this.state.streak >= 5) multiplier = 3;
+                
+                const timeBonus = Math.ceil(this.state.timeLeft) * 10;
+                this.state.score += (this.config.baseScore + timeBonus) * multiplier;
+                this.state.correctCount++;
+                
+                setTimeout(() => this.nextTurn(), 1500);
+            } else {
+                // Wrong
+                audio.playWrong();
+                btnElement.classList.add('wrong-anim');
+                this.state.streak = 0; // Reset streak
+                
+                // Highlight correct
+                Array.from(this.dom.options.children).forEach(b => {
+                    if(b.innerText === target.name) b.classList.add('correct-anim');
+                });
+                
+                if(this.state.survivalMode) {
+                    setTimeout(() => this.endGame(true), 1500);
+                } else {
+                    setTimeout(() => this.nextTurn(), 1500);
+                }
+            }
+        },
+
+        handleTimeout: function() {
+            this.state.isLocked = true;
+            audio.playWrong();
+            this.state.streak = 0;
+            const target = this.state.questionData[this.state.currentQuestion];
+            this.showContext(target);
+            
+            Array.from(this.dom.options.children).forEach(b => {
+                if(b.innerText === target.name) b.classList.add('wrong-anim');
+            });
+
+            if(this.state.survivalMode) {
+                setTimeout(() => this.endGame(true), 1500);
+            } else {
+                setTimeout(() => this.nextTurn(), 1500);
+            }
+        },
+
+        nextTurn: function() {
+            this.state.currentQuestion++;
+            this.loadLevel();
+        },
+
+        endGame: function(died) {
+            this.switchScreen('end');
+            
+            let accuracy = (this.state.correctCount / this.state.currentQuestion) * 100;
+            if(isNaN(accuracy)) accuracy = 0;
+            
+            // Survival Text
+            if (this.state.survivalMode) {
+                this.dom.endTitle.innerText = "SURVIVAL OVER";
+                this.dom.endMessage.innerText = `You survived ${this.state.correctCount} rounds!`;
+            } else {
+                this.dom.endTitle.innerText = "GAME OVER";
+                let stars = "☆☆☆";
+                let message = "Keep Practice!";
+                this.dom.starDisplay.classList.remove('gold');
+
+                if (accuracy === 100) { 
+                    stars = "★★★"; message = "Geography Genius!"; 
+                    this.dom.starDisplay.classList.add('gold');
+                    audio.playWin();
+                    confetti.start(); 
+                }
+                else if (accuracy >= 70) { stars = "★★☆"; message = "Great Job!"; audio.playWin(); }
+                else if (accuracy >= 40) { stars = "★☆☆"; message = "Not Bad!"; }
+                
+                this.dom.starDisplay.innerText = stars;
+                this.dom.endMessage.innerText = message;
+            }
+
+            this.dom.finalScore.innerText = this.state.score;
+            this.dom.finalAccuracy.innerText = `${Math.round(accuracy)}%`;
+
+            // Save High Score
+            const key = `flag_best_${this.state.difficulty}`;
+            const currentBest = parseInt(localStorage.getItem(key) || 0);
+            if(this.state.score > currentBest) {
+                localStorage.setItem(key, this.state.score);
+                this.init(); // Refresh menu numbers
+            }
+        },
+
+        switchScreen: function(screenName) {
+            confetti.stop();
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            if(screenName === 'start') {
+                this.dom.start.classList.add('active');
+                this.init();
+            }
+            if(screenName === 'game') this.dom.game.classList.add('active');
+            if(screenName === 'end') this.dom.end.classList.add('active');
+        }
+    };
+
+    // --- CONFETTI SYSTEM (Miniature) ---
+    const confetti = {
+        ctx: document.getElementById('confetti-canvas').getContext('2d'),
+        particles: [],
+        running: false,
+        resize: function() {
+            this.ctx.canvas.width = window.innerWidth;
+            this.ctx.canvas.height = window.innerHeight;
+        },
+        start: function() {
+            this.running = true;
+            this.particles = [];
+            this.resize();
+            for(let i=0; i<100; i++) {
+                this.particles.push({
+                    x: Math.random() * this.ctx.canvas.width,
+                    y: Math.random() * this.ctx.canvas.height - this.ctx.canvas.height,
+                    vx: Math.random() * 4 - 2,
+                    vy: Math.random() * 4 + 2,
+                    color: `hsl(${Math.random()*360}, 100%, 50%)`
+                });
+            }
+            this.loop();
+        },
+        stop: function() { this.running = false; this.ctx.clearRect(0,0,this.ctx.canvas.width,this.ctx.canvas.height); },
+        loop: function() {
+            if(!this.running) return;
+            this.ctx.clearRect(0,0,this.ctx.canvas.width,this.ctx.canvas.height);
+            this.particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if(p.y > this.ctx.canvas.height) p.y = -10;
+                this.ctx.fillStyle = p.color;
+                this.ctx.fillRect(p.x, p.y, 8, 8);
+            });
+            requestAnimationFrame(() => this.loop());
+        }
+    };
+
+    window.addEventListener('resize', () => confetti.resize());
+    game.init();
+
+</script>
+</body>
+</html>
